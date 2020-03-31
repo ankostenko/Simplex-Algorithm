@@ -1,6 +1,19 @@
 /*
 		TODO: Save values of matrix on resize
 		TODO: [Save values to file] and restore values from file
+		TODO: Calculate matrix for explicit basis
+		[] Возможность решения задачи с использованием заданных базисных переменных.
+		[] Работа с обыкновенными и десятичными дробями.
+		[] Контроль данных (защита от «дурака»)
+		[] [Сохранение введённой задачи в файл] и чтение из файла.
+		[] В пошаговом режиме возможность возврата назад.
+		[] Справка.
+		[] Контекстно-зависимая помощь.
+		[x] Возможность диалогового ввода размерности задачи и матрицы коэффициентов целевой функции в канонической форме. Размерность не более 16*16.
+		[x] Реализация метода искусственного базиса.
+		[x] Выбор автоматического и пошагового режима решения задачи.
+		[x] В пошаговом режиме возможность выбора опорного элемента.
+		[x] Поддержка мыши.
 */
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -23,10 +36,9 @@ static int Clamp(int value, int min, int max) {
 	return value;
 }
 
-std::vector<Matrix> AllStepsRealMatricies;
-std::vector<Matrix> ArtificialBasisMatricies;
 std::vector<Step> ArtificialBasisSteps;
 std::vector<Step> SimplexAlgorithmSteps;
+std::vector<Step> ExplicitBasisSteps;
 
 void PrintMatrix(Matrix& matrix) {
 	for (int i = 0; i < matrix.RowNumber; i++) {
@@ -160,7 +172,11 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<float> &Re
 	// Copy table one to one multiplying basis rows on coefficients of target function
 	for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
 		for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
-			TargetFunctionCoefficientsMatrix[i][j] = (-1) * RealTargetFunction[step.NumbersOfVariables[i] - 1] * step.RealMatrix[i][j];
+			if (j < step.RealMatrix.ColNumber - 1) {
+				TargetFunctionCoefficientsMatrix[i][j] = (-1) * RealTargetFunction[step.NumbersOfVariables[i] - 1] * step.RealMatrix[i][j];
+			} else {
+				TargetFunctionCoefficientsMatrix[i][j] = RealTargetFunction[step.NumbersOfVariables[i] - 1] * step.RealMatrix[i][j];
+			}
 		}
 	}
 
@@ -180,7 +196,7 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<float> &Re
 		ColumnSum += TargetFunctionCoefficientsMatrix[i][TargetFunctionCoefficientsMatrix.ColNumber - 1];
 	}
 	ColumnSum += RealTargetFunction[RealTargetFunction.size() - 1];
-	step.RealMatrix[step.RealMatrix.RowNumber - 1][step.RealMatrix.ColNumber - 1] = ColumnSum;
+	step.RealMatrix[step.RealMatrix.RowNumber - 1][step.RealMatrix.ColNumber - 1] = -ColumnSum;
 }
 
 RowAndColumn CurrentLeadPos;
@@ -330,7 +346,7 @@ void DisplayStepOnScreen(Step &step) {
 			}
 
 			// Fill with a color chosen cell
-			// BUG: Wrong colors are colored, colored cell doesn't change row number
+			// BUG: Rectangles move whenever scrolling is happening
 			if (!step.IsCompleted && i == CurrentLeadPos.Row && j == CurrentLeadPos.Column && step.StepID == ArtificialBasisSteps.size() - 2) {
 				float width = ImGui::GetColumnWidth();
 				float height = ImGui::GetTextLineHeight();
@@ -371,6 +387,21 @@ void DisplayAllSimplexAlgorithmSteps() {
 			if (ImGui::BeginTabItem("Simplex Algorithm")) {
 				for (int i = 0; i < SimplexAlgorithmSteps.size(); i++) {
 					DisplayStepOnScreen(SimplexAlgorithmSteps[i]);
+					ImGui::Separator();
+				}
+				ImGui::EndTabItem();
+			}
+			ImGui::EndTabBar();
+		}
+	}
+}
+
+void DisplaySteps(std::vector<Step> Steps, int StartIndex) {
+	if (Steps.size() != 0) {
+		if (ImGui::BeginTabBar("Simplex Algorithm Solutions")) {
+			if (ImGui::BeginTabItem("Simplex Algorithm")) {
+				for (int i = StartIndex; i < Steps.size(); i++) {
+					DisplayStepOnScreen(Steps[i]);
 					ImGui::Separator();
 				}
 				ImGui::EndTabItem();
@@ -485,6 +516,103 @@ void SimplexAlgorithm(Step step) {
 	}
 }
 
+void GaussElimination(Matrix& matrix) {
+	int PivotRow = 0;
+	int PivotColumn = 0;
+	int num = 2;
+
+	while (PivotRow < (matrix.RowNumber - 1) && PivotColumn < matrix.ColNumber - 1) {
+		// Find max value in a column
+		float MaxPivot = fabs(matrix[PivotRow][PivotColumn]);
+		int MaxPivotIdx = PivotRow;
+		for (int i = PivotRow; i < matrix.RowNumber - PivotRow - 1 - 1; i++) {
+			if (fabs(matrix[i][PivotColumn]) > MaxPivot) {
+				MaxPivot = fabs(matrix[i][PivotColumn]);
+				MaxPivotIdx = i;
+			}
+		}
+
+		if (fabs(matrix[MaxPivotIdx][PivotColumn]) < EPSILON) {
+			PivotColumn += 1;
+		} else {
+			matrix.SwapRows(PivotRow, MaxPivotIdx);
+
+			// Substract all rows below pivot
+			for (int i = PivotRow + 1; i < matrix.RowNumber - 1; i++) {
+
+				float Factor = matrix[i][PivotColumn] / matrix[PivotRow][PivotColumn];
+				matrix[i][PivotColumn] = 0.0f;
+
+				for (int j = PivotColumn + 1; j < matrix.ColNumber; j++) {
+					matrix[i][j] = matrix[i][j] - matrix[PivotRow][j] * Factor;
+				}
+			}
+
+			PivotRow++;
+			PivotColumn++;
+		}
+	}
+
+	// Backward substitution
+	for (int i = matrix.RowNumber - 2; i > 0; i--) {
+		if (fabs(matrix[i][i]) < EPSILON) continue;
+		for (int j = i; j > 0; j--) {
+			float Factor = matrix[j - 1][i] / matrix[i][i];
+			for (int k = i; k < matrix.ColNumber - 1; k++) {
+				matrix[j - 1][k] -= matrix[i][k] * Factor;
+			}
+
+			matrix[j - 1][matrix.ColNumber - 1] -= matrix[i][matrix.ColNumber - 1] * Factor;
+		}
+	}
+
+	// Normalization
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		float Pivot = matrix[i][i];
+		if (fabs(Pivot) < EPSILON) continue;
+		for (int j = i; j < matrix.ColNumber; j++) {
+			matrix[i][j] /= Pivot;
+		}
+	}
+}
+
+Step ExplicitBasis(Step step, std::vector<float>& RealExplicitBasis, std::vector<float>& RealTargetFunction) {
+	// 1. Prepare matrix to Gauss elimination
+	std::vector<int> PositionsOfNonZeroElements;
+	std::vector<int> VariablesPositions;
+	for (int i = 0; i < RealExplicitBasis.size(); i++) {
+		VariablesPositions.push_back(i + 1);
+	}
+
+	// 1.1 Find positions of non-zero elements
+	for (int i = 0; i < RealExplicitBasis.size(); i++) {
+		if (fabs(RealExplicitBasis[i]) > EPSILON) {
+			PositionsOfNonZeroElements.push_back(i);
+		}
+	}
+
+	// 1.2 Swap matrix column and variables to first (RowNumber) columns
+	for (int i = 0; i < PositionsOfNonZeroElements.size(); i++) {
+		int NonZeroPosition = PositionsOfNonZeroElements[i];
+		step.RealMatrix.SwapColumns(i, NonZeroPosition);
+		std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
+	}
+
+	// 2. Gauss Elimination
+	GaussElimination(step.RealMatrix);
+
+	// 3. Complete table for first step of simplex alogrithm
+	// 3.1 Delete first RowNumber columns
+	for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+		step.RealMatrix.DeleteColumn(0);
+	}
+
+	step.NumbersOfVariables = VariablesPositions;
+	// BUG: Coefficients have opposite sign as they should have 
+	MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
+	return step;
+}
+
 int main() {
 	// Problem characteristics
 	int NumberOfVariables;
@@ -577,7 +705,7 @@ int main() {
 			ImGui::PushID("Explicit Basis");
 			if (!IsFractionalCoefficients) {
 				ImGui::PushID("Real Basis");
-				for (int i = 0; i < RealMatrix.ColNumber; i++) {
+				for (int i = 0; i < RealMatrix.ColNumber - 1; i++) {
 					ImGui::PushID(i);
 					ImGui::SetNextItemWidth(75);
 					ImGui::InputScalar("", ImGuiDataType_Float, &RealExplicitBasis.at(i));
@@ -588,7 +716,7 @@ int main() {
 			} else {
 				ImGui::PushID("Fractional Basis");
 				ImGui::PushID("Numerator");
-				for (int i = 0; i < FractionalMatrix.ColNumber; i++) {
+				for (int i = 0; i < FractionalMatrix.ColNumber - 1; i++) {
 					ImGui::PushID(i);
 					ImGui::SetNextItemWidth(75);
 					ImGui::InputScalar("", ImGuiDataType_S32, &FractionalExplicitBasis.at(i).numerator);
@@ -598,7 +726,7 @@ int main() {
 				ImGui::PopID();
 
 				ImGui::PushID("Denominator");
-				for (int i = 0; i < FractionalMatrix.ColNumber; i++) {
+				for (int i = 0; i < FractionalMatrix.ColNumber - 1; i++) {
 					ImGui::PushID(i);
 					ImGui::SetNextItemWidth(75);
 					ImGui::InputScalar("", ImGuiDataType_U32, &FractionalExplicitBasis.at(i).denominator);
@@ -755,35 +883,70 @@ int main() {
 		ImGui::Text("Solution");
 
 		if (ShowSolution) {
-			// Calculate next step of simplex algorithm
-			size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
-			step = ArtificialBasisSteps[LastElementIndex];
-			if (ArtificialBasisSteps.size() == 1) {
-				step.RealMatrix = RealMatrix;
-				step.IsAutomatic = IsAutomatic;
-				step.IsCompleted = false;
-				step.IsArtificialStep = true;
-				// Artificial variables
-				for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
-					step.NumbersOfVariables.push_back(step.RealMatrix.ColNumber + i);
+			if (IsArtificialBasis) {
+				// Calculate next step of simplex algorithm
+				size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
+				step = ArtificialBasisSteps[LastElementIndex];
+				if (ArtificialBasisSteps.size() == 1) {
+					step.RealMatrix = RealMatrix;
+					step.IsAutomatic = IsAutomatic;
+					step.IsCompleted = false;
+					step.IsArtificialStep = true;
+					// Artificial variables
+					for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+						step.NumbersOfVariables.push_back(step.RealMatrix.ColNumber + i);
+					}
+					// Variables
+					for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
+						step.NumbersOfVariables.push_back(i + 1);
+					}
+					MakeArtificialFunctionCoefficients(step.RealMatrix);
+					ArtificialBasisSteps.push_back(step);
 				}
-				// Variables
-				for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-					step.NumbersOfVariables.push_back(i + 1);
-				}
-				MakeArtificialFunctionCoefficients(step.RealMatrix);
-				ArtificialBasisSteps.push_back(step);
-			}
 
-			if (!step.IsAutomatic) {
-				step.IsWaitingForInput = true;
+				if (!step.IsAutomatic) {
+					step.IsWaitingForInput = true;
+				} else {
+					step.IsWaitingForInput = false;
+				}
+
+				// Display all steps that has been calculated
+				DisplayAllArtificialSteps();
+				ArtificialBasis(step);
 			} else {
-				step.IsWaitingForInput = false;
-			}
+				// TODO: Explicit basis
+				if (SimplexAlgorithmSteps.size() == 0) {
+					step.RealMatrix = RealMatrix;
+					step.IsAutomatic = IsAutomatic;
+					step.IsCompleted = false;
+					step.IsArtificialStep = true;
+					// TODO: Add input checks 
+					// [] Check if input vector doesn't lead to degenerate matrix
+					// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
+					//		or drop this method and use artificial basis instead
+					// First check if number of non-zero elements in the explicit vector less or equal then a number of limitations
+					int AmountOfNonZeroElements = 0;
+					for (float el : RealExplicitBasis) {
+						if (fabs(el) > EPSILON) {
+							AmountOfNonZeroElements += 1;
+						}
+					}
 
-			// Display all steps that has been calculated
-			DisplayAllArtificialSteps();
-			ArtificialBasis(step);
+					if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
+						printf("\nNumber of non-zero elements greater then number of limitations\n");
+						assert(0);
+					}
+
+					step = ExplicitBasis(step, RealExplicitBasis, RealTargetFunction);
+					step.IsCompleted = true;
+					//ExplicitBasisSteps.push_back(step);
+					DisplaySteps(ExplicitBasisSteps, 0);
+				}
+				
+				if (SimplexAlgorithmSteps.size() != 0) {
+					//DisplaySteps(ExplicitBasisSteps, 0);
+				}
+			}
 
 			if (step.IsCompleted) {
 				if (ImGui::Button("Start Simplex Algorithm")) {
@@ -793,13 +956,17 @@ int main() {
 
 			if (StartSimplexAlgorithm) {
 				if (SimplexAlgorithmSteps.size() == 0) {
-					step.RealMatrix = ArtificialBasisSteps[LastElementIndex].RealMatrix;
+					if (IsArtificialBasis) {
+						size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
+						step.RealMatrix = ArtificialBasisSteps[LastElementIndex].RealMatrix;
+						step.NumbersOfVariables = ArtificialBasisSteps[LastElementIndex].NumbersOfVariables;
+						MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
+					}
+
 					step.IsAutomatic = IsAutomatic;
 					step.IsCompleted = false;
 					step.IsArtificialStep = false;
 
-					step.NumbersOfVariables = ArtificialBasisSteps[LastElementIndex].NumbersOfVariables;
-					MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
 					SimplexAlgorithmSteps.push_back(step);
 				} else {
 					size_t LastSimplexAlgorithmElementIndex = SimplexAlgorithmSteps.size() - 1;
@@ -809,66 +976,6 @@ int main() {
 				SimplexAlgorithm(step);
 			}
 
-
-			/*
-			ImGui::Text("Matrix");
-
-			if (!IsFractionalCoefficients) {
-				for (int i = 0; i < RealMatrix.RowNumber; i++) {
-					for (int j = 0; j < RealMatrix.ColNumber; j++) {
-						ImGui::Text(std::to_string(RealMatrix[i][j]).c_str());
-						if (j < RealMatrix.ColNumber - 1) { ImGui::SameLine(); }
-					}
-				}
-			} else {
-				for (int i = 0; i < FractionalMatrix.RowNumber; i++) {
-					for (int j = 0; j < FractionalMatrix.ColNumber; j++) {
-						ImGui::Text(std::to_string(FractionalMatrix[i][j].numerator).c_str());
-						if (j < FractionalMatrix.ColNumber - 1) { ImGui::SameLine(); }
-					}
-					for (int j = 0; j < FractionalMatrix.ColNumber; j++) {
-						ImGui::Text(std::to_string(FractionalMatrix[i][j].denominator).c_str());
-						if (j < FractionalMatrix.ColNumber - 1) { ImGui::SameLine(); }
-					}
-				}
-			}
-
-			// ------------DEBUG-------------
-			ImGui::Text("Target Function");
-			if (!IsFractionalCoefficients) {
-				for (int i = 0; i < RealTargetFunction.size(); i++) {
-					ImGui::Text(std::to_string(RealTargetFunction[i]).c_str());
-					if (i < RealTargetFunction.size() - 1) { ImGui::SameLine(); }
-				}
-			} else {
-				for (int i = 0; i < FractionalTargetFunction.size(); i++) {
-					ImGui::Text(std::to_string(FractionalTargetFunction.at(i).numerator).c_str());
-					if (i < FractionalTargetFunction.size() - 1) { ImGui::SameLine(); }
-				}
-				for (int i = 0; i < FractionalTargetFunction.size(); i++) {
-					ImGui::Text(std::to_string(FractionalTargetFunction.at(i).denominator).c_str());
-					if (i < FractionalTargetFunction.size() - 1) { ImGui::SameLine(); }
-				}
-			}
-
-			ImGui::Text("Explicit Basis");
-			if (!IsFractionalCoefficients) {
-				for (int i = 0; i < RealExplicitBasis.size(); i++) {
-					ImGui::Text(std::to_string(RealExplicitBasis[i]).c_str());
-					if (i < RealExplicitBasis.size() - 1) { ImGui::SameLine(); }
-				}
-			} else {
-				for (int i = 0; i < FractionalExplicitBasis.size(); i++) {
-					ImGui::Text(std::to_string(FractionalExplicitBasis.at(i).numerator).c_str());
-					if (i < FractionalExplicitBasis.size() - 1) { ImGui::SameLine(); }
-				}
-				for (int i = 0; i < FractionalExplicitBasis.size(); i++) {
-					ImGui::Text(std::to_string(FractionalExplicitBasis.at(i).denominator).c_str());
-					if (i < FractionalExplicitBasis.size() - 1) { ImGui::SameLine(); }
-				}
-			}
-			// ------------------------------
-			*/
 			// SAVING TO FILE
 			if (ImGui::Button("Save to file")) {
 				FILE* file = fopen("ProblemConfiguration.txt", "w");

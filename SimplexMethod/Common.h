@@ -107,6 +107,22 @@ struct Matrix {
 		ColNumber = mat.ColNumber;
 		return *this;
 	}
+
+	void SwapColumns(int IdxC1, int IdxC2) {
+		assert(IdxC1 >= 0 && IdxC1 < ColNumber - 1);
+		assert(IdxC2 >= 0 && IdxC2 < ColNumber - 1);
+		for (int i = 0; i < RowNumber; i++) {
+			std::swap((*this)[i][IdxC1], (*this)[i][IdxC2]);
+		}
+	}
+
+	void SwapRows(int IdxR1, int IdxR2) {
+		assert(IdxR1 >= 0 && IdxR1 < RowNumber - 1);
+		assert(IdxR2 >= 0 && IdxR2 < RowNumber - 1);
+		for (int Col = 0; Col < ColNumber; Col++) {
+			std::swap((*this)[IdxR1][Col], (*this)[IdxR2][Col]);
+		}
+	}
 };
 
 struct RowAndColumn {
