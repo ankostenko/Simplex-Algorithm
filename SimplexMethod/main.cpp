@@ -59,8 +59,7 @@ AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArti
 			for (int j = 0; j < matrix.RowNumber - 1; j++) {
 				if (matrix[j][i] > EPSILON) {
 					state = CONTINUE;
-					if (IsAutomatic) {
-						assert(CurrentColumnIndex != NULL);
+					if (IsAutomatic && CurrentColumnIndex != NULL) {
 						*CurrentColumnIndex = i;
 					}
 					break;
@@ -207,11 +206,20 @@ void ArtificialBasis(Step step) {
 		return;
 	}
 
+	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, NULL);
+	if (state == UNLIMITED_SOLUTION) {
+		printf("Solution is unlimited");
+		step.IsCompleted = true;
+	} else if (state == COMPLETED) {
+		printf("Algorithm is completed");
+		step.IsCompleted = true;
+	}
+
 	// Choose lead element
+	std::vector<std::pair<float, int>> MinimumAndRowIndex;
 	if (!step.IsAutomatic) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
-		int CurrentColumnIndex = -1;
 		static int Column = 0;
 		// Pair of id and column number
 		std::vector<RowAndColumn> Leads;
@@ -219,43 +227,49 @@ void ArtificialBasis(Step step) {
 			CurrentRowIndex = -1;
 			float CurrentLead = FLT_MAX;
 			float ColumnMinimum = FLT_MAX;
+			MinimumAndRowIndex.clear();
 			if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
 				for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
 						if (step.RealMatrix[j][i] > 0) {
-							if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] < ColumnMinimum) {	
+							if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] <= ColumnMinimum + EPSILON) {
 								ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
 								CurrentLead = step.RealMatrix[j][i];
 								CurrentRowIndex = j;
+								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
 							}
 						}
 				}
 			}
 
 			if (CurrentRowIndex != -1) {
-				bool IsRowBanned = false;
-				for (auto row : step.RowsBannedToSwap) {
-					if (row == CurrentRowIndex) {
-						IsRowBanned = true;
+				// Delete all elements that are not minimum
+				// There can be more than one minimum
+				for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+					auto MR = MinimumAndRowIndex[i];
+					if (fabs(MR.first - ColumnMinimum) > EPSILON) {
+						MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+						i = 0;
 					}
 				}
 
-				if (!IsRowBanned) {
-					if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-						ImGui::PushID(i);
-						ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
-						ImGui::PopID();
-						Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+				for (std::pair<float, int> MR : MinimumAndRowIndex) {
+					bool IsRowBanned = false;
+					for (auto row : step.RowsBannedToSwap) {
+						if (row == MR.second) {
+							IsRowBanned = true;
+						}
+					}
+
+					if (!IsRowBanned) {
+						if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
+							ImGui::PushID(i);
+							ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
+							ImGui::PopID();
+							Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+							break;
+						}
 					}
 				}
-			}
-
-			AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, &CurrentColumnIndex);
-			if (state == UNLIMITED_SOLUTION) {
-				printf("Solution is unlimited");
-				step.IsCompleted = true;
-			} else if (state == COMPLETED) {
-				printf("Algorithm is completed");
-				step.IsCompleted = true;
 			}
 		}
 
@@ -418,11 +432,19 @@ void SimplexAlgorithm(Step step) {
 		return;
 	}
 
+	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, NULL);
+	if (state == UNLIMITED_SOLUTION) {
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution is unlimited!");
+		step.IsCompleted = true;
+	} else if (state == COMPLETED) {
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Algorithm has completed!");
+		step.IsCompleted = true;
+	}
+
 	// Choose lead element
 	if (!step.IsAutomatic) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
-		int CurrentColumnIndex = -1;
 		static int Column = 0;
 		// Pair of id and column number
 		std::vector<RowAndColumn> Leads;
@@ -440,15 +462,6 @@ void SimplexAlgorithm(Step step) {
 						}
 					}
 				}
-			}
-
-			AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, &CurrentColumnIndex);
-			if (state == UNLIMITED_SOLUTION) {
-				ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution is unlimited!");
-				step.IsCompleted = true;
-			} else if (state == COMPLETED) {
-				ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Algorithm has completed!");
-				step.IsCompleted = true;
 			}
 
 			if (state == CONTINUE && CurrentRowIndex != -1) {
