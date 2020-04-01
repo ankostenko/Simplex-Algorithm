@@ -1,14 +1,14 @@
 /*
 		TODO: Save values of matrix on resize
 		TODO: [Save values to file] and restore values from file
-		TODO: Calculate matrix for explicit basis
-		[] Возможность решения задачи с использованием заданных базисных переменных.
+		BUG: Sometimes automatic algorithm doesn't swap artificial variable
 		[] Работа с обыкновенными и десятичными дробями.
 		[] Контроль данных (защита от «дурака»)
 		[] [Сохранение введённой задачи в файл] и чтение из файла.
 		[] В пошаговом режиме возможность возврата назад.
 		[] Справка.
 		[] Контекстно-зависимая помощь.
+		[x] Возможность решения задачи с использованием заданных базисных переменных.
 		[x] Возможность диалогового ввода размерности задачи и матрицы коэффициентов целевой функции в канонической форме. Размерность не более 16*16.
 		[x] Реализация метода искусственного базиса.
 		[x] Выбор автоматического и пошагового режима решения задачи.
@@ -54,6 +54,7 @@ AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArti
 	
 	for (int i = 0; i < matrix.ColNumber - 1; i++) {
 		if (matrix[matrix.RowNumber - 1][i] < -EPSILON) {
+			state = UNDEFINED;
 			// Check if there is at least one positive element in a column
 			for (int j = 0; j < matrix.RowNumber - 1; j++) {
 				if (matrix[j][i] > EPSILON) {
@@ -67,6 +68,7 @@ AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArti
 			}
 			if (state == UNDEFINED) {
 				state = UNLIMITED_SOLUTION;
+				break;
 			}
 		}
 	}
@@ -440,15 +442,6 @@ void SimplexAlgorithm(Step step) {
 				}
 			}
 
-			if (CurrentRowIndex != -1) {
-				Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
-				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-					ImGui::PushID(i);
-					ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
-					ImGui::PopID();
-				}
-			}
-
 			AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, &CurrentColumnIndex);
 			if (state == UNLIMITED_SOLUTION) {
 				ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution is unlimited!");
@@ -456,6 +449,15 @@ void SimplexAlgorithm(Step step) {
 			} else if (state == COMPLETED) {
 				ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Algorithm has completed!");
 				step.IsCompleted = true;
+			}
+
+			if (state == CONTINUE && CurrentRowIndex != -1) {
+				Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
+					ImGui::PushID(i);
+					ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
+					ImGui::PopID();
+				}
 			}
 		}
 
@@ -608,7 +610,6 @@ Step ExplicitBasis(Step step, std::vector<float>& RealExplicitBasis, std::vector
 	}
 
 	step.NumbersOfVariables = VariablesPositions;
-	// BUG: Coefficients have opposite sign as they should have 
 	MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
 	return step;
 }
