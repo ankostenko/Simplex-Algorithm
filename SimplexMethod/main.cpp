@@ -49,6 +49,194 @@ void PrintMatrix(Matrix& matrix) {
 	}
 }
 
+void SaveToFile(Step &step, bool IsFractionalCoefficients, bool IsArtificialBasis, std::vector<float> &RealExplicitBasis, std::vector<float> &RealTargetFunction, 
+							std::vector<Fraction> &FractionalExplicitBasis, std::vector<Fraction> &FractionalTargetFunction) {
+	FILE* file = fopen("ProblemConfiguration.txt", "w");
+	if (!file) { printf("Cannot open a file!\n"); }
+
+	/*
+	FILE FORMAT:
+		<number> - number of variables
+		<number> - number of limitations
+		F/R - fractional/real
+		E/A - explicit basis/artificial basis
+		Matrix of limitations
+		Target function
+	*/
+
+	if (!IsFractionalCoefficients) {
+		std::string nv = (std::to_string(step.RealMatrix.ColNumber) + std::string("\n"));
+		fprintf(file, nv.c_str());
+		std::string nl = (std::to_string(step.RealMatrix.RowNumber) + std::string("\n"));
+		fprintf(file, nl.c_str());
+		fprintf(file, "R\n");
+
+		if (IsArtificialBasis) {
+			fprintf(file, "A\n");
+		} else {
+			fprintf(file, "E\n");
+			for (int i = 0; i < RealExplicitBasis.size(); i++) {
+				fprintf(file, std::to_string(RealExplicitBasis[i]).c_str());
+				fprintf(file, " ");
+			}
+			fprintf(file, "\n");
+		}
+
+		fprintf(file, "\n");
+		for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
+			for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
+				fprintf(file, std::to_string(step.RealMatrix[i][j]).c_str());
+				fprintf(file, " ");
+			}
+			fprintf(file, "\n");
+		}
+		fprintf(file, "\n");
+		for (int i = 0; i < RealTargetFunction.size(); i++) {
+			fprintf(file, std::to_string(RealTargetFunction[i]).c_str());
+			fprintf(file, " ");
+		}
+	} else {
+		std::string nv = (std::to_string(step.FracMatrix.ColNumber) + std::string("\n"));
+		fprintf(file, nv.c_str());
+		std::string nl = (std::to_string(step.FracMatrix.RowNumber) + std::string("\n"));
+		fprintf(file, nl.c_str());
+		fprintf(file, "F\n");
+
+		if (IsArtificialBasis) {
+			fprintf(file, "A\n");
+		} else {
+			fprintf(file, "E\n");
+			for (int i = 0; i < FractionalExplicitBasis.size(); i++) {
+				fprintf(file, (std::to_string(FractionalExplicitBasis[i].numerator) + std::string("/") + std::to_string(FractionalExplicitBasis[i].denominator)).c_str());
+				fprintf(file, " ");
+			}
+			fprintf(file, "\n");
+		}
+
+		fprintf(file, "\n");
+		for (int i = 0; i < step.FracMatrix.RowNumber; i++) {
+			for (int j = 0; j < step.FracMatrix.ColNumber; j++) {
+				fprintf(file, (std::to_string(step.FracMatrix[i][j].numerator) + std::string("/") + std::to_string(step.FracMatrix[i][j].denominator)).c_str());
+				fprintf(file, " ");
+			}
+			fprintf(file, "\n");
+		}
+		fprintf(file, "\n");
+		for (int i = 0; i < FractionalTargetFunction.size(); i++) {
+			fprintf(file, (std::to_string(FractionalTargetFunction[i].numerator) + std::string("/") + std::to_string(FractionalTargetFunction[i].denominator)).c_str());
+			fprintf(file, " ");
+		}
+	}
+	fclose(file);
+}
+
+bool ReadFromFile(Step &step, bool &IsFractionalCoefficients, bool &IsArtificialBasis, std::vector<float>& RealExplicitBasis, std::vector<float>& RealTargetFunction,
+						std::vector<Fraction>& FractionalExplicitBasis, std::vector<Fraction>& FractionalTargetFunction) {
+	FILE* file = fopen("ProblemConfiguration.txt", "r");
+	if (!file) { printf("Cannot open a file!\n"); }
+
+	/*
+	FILE FORMAT:
+		<number> - number of variables
+		<number> - number of limitations
+		F/R - fractional/real
+		E/A - explicit basis/artificial basis
+		Matrix of limitations
+		Target function
+	*/
+
+	int NumberOfVariables = -1;
+	int ret = fscanf(file, "%d", &NumberOfVariables);
+	if (ret == EOF || ret == EILSEQ) { return false; }
+
+	int NumberOfLimitations = -1;
+	ret = fscanf(file, "%d", &NumberOfLimitations);
+	if (ret == EOF || ret == EILSEQ) { return false; }
+
+	char FR[2];
+	ret = fscanf(file, "%s", FR);
+	if (ret == EOF || ret == EILSEQ) { return false; }
+
+	if (FR[0] == 'F') {
+		IsFractionalCoefficients = true;
+	} else if (FR[0] == 'R') {
+		IsFractionalCoefficients = false;
+	} else {
+		return false;
+	}
+
+	char EA[2];
+	ret = fscanf(file, "%s", EA);
+	if (ret == EOF || ret == EILSEQ) { return false; }
+
+	if (EA[0] == 'E') {
+		IsArtificialBasis = false;
+		if (IsFractionalCoefficients) {
+			for (int i = 0; i < NumberOfVariables; i++) {
+				int Numerator, Denominator;
+				ret = fscanf(file, "%d/%d", &Numerator, &Denominator);
+				if (ret == EOF || ret == EILSEQ) { return false; }
+
+				FractionalExplicitBasis.push_back(Fraction({Numerator, Denominator}));
+			}
+		} else {
+			for (int i = 0; i < NumberOfVariables; i++) {
+				float Coefficient;
+				ret = fscanf(file, "%f", &Coefficient);
+				if (ret == EOF || ret == EILSEQ) { return false; }
+
+				RealExplicitBasis.push_back(Coefficient);
+			}
+		}
+	} else if (EA[0] == 'A') {
+		IsArtificialBasis = true;
+	} else {
+		return false;
+	}
+
+	if (IsFractionalCoefficients) {
+		for (int Row = 0; Row < NumberOfLimitations; Row++) {
+			for (int Col = 0; Col < NumberOfVariables; Col++) {
+				int Numerator, Denominator;
+				ret = fscanf(file, "%d/%d", &Numerator, &Denominator);
+				if (ret == EOF || ret == EILSEQ) { return false; }
+
+				step.FracMatrix[Row][Col] = Fraction{ Numerator, Denominator };
+			}
+		}
+	} else {
+		for (int Row = 0; Row < NumberOfLimitations; Row++) {
+			for (int Col = 0; Col < NumberOfVariables; Col++) {
+				float Coefficient;
+				ret = fscanf(file, "%f", &Coefficient);
+				if (ret == EOF || ret == EILSEQ) { return false; }
+
+				step.RealMatrix[Row][Col] = Coefficient;
+			}
+		}
+	}
+
+	if (IsFractionalCoefficients) {
+		for (int i = 0; i < NumberOfVariables; i++) {
+			int Numerator, Denominator;
+			ret = fscanf(file, "%d/%d", &Numerator, &Denominator);
+			if (ret == EOF || ret == EILSEQ) { return false; }
+
+			FractionalTargetFunction[i] = Fraction{ Numerator, Denominator };
+		}
+	} else {
+		for (int i = 0; i < NumberOfVariables; i++) {
+			float Coefficient;
+			ret = fscanf(file, "%f", &Coefficient);
+			if (ret == EOF || ret == EILSEQ) { return false; }
+
+			RealTargetFunction[i] = Coefficient;
+		}
+	}
+
+	return true;
+}
+
 AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArtificialStep, int *CurrentColumnIndex) {
 	AlgorithmState state = UNDEFINED;
 	
@@ -362,12 +550,11 @@ void DisplayStepOnScreen(Step &step) {
 			}
 
 			// Fill with a color chosen cell
-			// BUG: Rectangles move whenever scrolling is happening
-			if (!step.IsCompleted && i == CurrentLeadPos.Row && j == CurrentLeadPos.Column && step.StepID == ArtificialBasisSteps.size() - 2) {
+			if ((!step.IsCompleted) && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
 				float width = ImGui::GetColumnWidth();
 				float height = ImGui::GetTextLineHeight();
 
-				ImVec2 CursorPos = ImGui::GetCursorPos();
+				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
 				DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
 			}
 			
@@ -988,89 +1175,6 @@ int main() {
 				}
 				DisplayAllSimplexAlgorithmSteps();
 				SimplexAlgorithm(step);
-			}
-
-			// SAVING TO FILE
-			if (ImGui::Button("Save to file")) {
-				FILE* file = fopen("ProblemConfiguration.txt", "w");
-				if (!file) { printf("Cannot open a file!\n"); }
-
-				/*
-					FILE FORMAT:
-						NV: <number> - number of variables
-						NL: <number> - number of limitations
-						F/R - fractional/real
-						E/A - explicit basis/artificial basis
-						ML: - Matrix of limitations
-								1.223 -1.23
-								0.232 0.14
-						TF:	Target function
-				*/
-
-				if (!IsFractionalCoefficients) {
-					std::string nv = (std::string("NV: ") + std::to_string(RealMatrix.ColNumber) + std::string("\n"));
-					fprintf(file, nv.c_str());
-					std::string nl = (std::string("NL: ") + std::to_string(RealMatrix.RowNumber) + std::string("\n"));
-					fprintf(file, nl.c_str());
-					fprintf(file, "R\n");
-
-					if (IsArtificialBasis) {
-						fprintf(file, "A\n");
-					} else {
-						fprintf(file, "E:\n");
-						for (int i = 0; i < RealExplicitBasis.size(); i++) {
-							fprintf(file, std::to_string(RealExplicitBasis[i]).c_str());
-							fprintf(file, " ");
-						}
-						fprintf(file, "\n");
-					}
-
-					fprintf(file, "ML:\n");
-					for (int i = 0; i < RealMatrix.RowNumber; i++) {
-						for (int j = 0; j < RealMatrix.ColNumber; j++) {
-							fprintf(file, std::to_string(RealMatrix[i][j]).c_str());
-							fprintf(file, " ");
-						}
-						fprintf(file, "\n");
-					}
-					fprintf(file, "TF:\n");
-					for (int i = 0; i < RealTargetFunction.size(); i++) {
-						fprintf(file, std::to_string(RealTargetFunction[i]).c_str());
-						fprintf(file, " ");
-					}
-				} else {
-					std::string nv = (std::string("NV: ") + std::to_string(FractionalMatrix.ColNumber) + std::string("\n"));
-					fprintf(file, nv.c_str());
-					std::string nl = (std::string("NL: ") + std::to_string(FractionalMatrix.RowNumber) + std::string("\n"));
-					fprintf(file, nl.c_str());
-					fprintf(file, "F\n");
-
-					if (IsArtificialBasis) {
-						fprintf(file, "A\n");
-					} else {
-						fprintf(file, "E:\n");
-						for (int i = 0; i < FractionalExplicitBasis.size(); i++) {
-							fprintf(file, (std::to_string(FractionalExplicitBasis[i].numerator) + std::string("/") + std::to_string(FractionalExplicitBasis[i].denominator)).c_str());
-							fprintf(file, " ");
-						}
-						fprintf(file, "\n");
-					}
-
-					fprintf(file, "ML:\n");
-					for (int i = 0; i < FractionalMatrix.RowNumber; i++) {
-						for (int j = 0; j < FractionalMatrix.ColNumber; j++) {
-							fprintf(file, (std::to_string(FractionalMatrix[i][j].numerator) + std::string("/") + std::to_string(FractionalMatrix[i][j].denominator)).c_str());
-							fprintf(file, " ");
-						}
-						fprintf(file, "\n");
-					}
-					fprintf(file, "TF:\n");
-					for (int i = 0; i < FractionalTargetFunction.size(); i++) {
-						fprintf(file, (std::to_string(FractionalTargetFunction[i].numerator) + std::string("/") + std::to_string(FractionalTargetFunction[i].denominator)).c_str());
-						fprintf(file, " ");
-					}
-				}
-				fclose(file);
 			}
 		}
 

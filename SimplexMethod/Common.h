@@ -9,9 +9,11 @@ struct Fraction {
 };
 
 struct FractionalMatrix {
-	Fraction* matrix;
+	Fraction* matrix = NULL;
 	int RowNumber;
 	int ColNumber;
+
+	FractionalMatrix() = default;
 
 	FractionalMatrix(int RowNumber, int ColNumber) : RowNumber(RowNumber), ColNumber(ColNumber) {
 		assert(RowNumber >= 0 && ColNumber >= 0);
@@ -20,7 +22,7 @@ struct FractionalMatrix {
 	}
 
 	~FractionalMatrix() {
-		delete matrix;
+		delete[] matrix;
 	}
 
 	void Resize(int NewRowNumber, int NewColNumber) {
@@ -146,6 +148,7 @@ struct Step {
 	bool IsCompleted;
 	std::vector<int> RowsBannedToSwap;
 	Matrix RealMatrix;
+	FractionalMatrix FracMatrix;
 	// First m variables are basis variables
 	std::vector<int> NumbersOfVariables;
 	bool IsArtificialStep;
