@@ -1,7 +1,4 @@
 /*
-		TODO: Save values of matrix on resize
-		TODO: [Save values to file] and restore values from file
-		BUG: Sometimes automatic algorithm doesn't swap artificial variable
 		[] Работа с обыкновенными и десятичными дробями.
 		[] Контроль данных (защита от «дурака»)
 		[] [Сохранение введённой задачи в файл] и чтение из файла.
@@ -238,7 +235,7 @@ bool ReadFromFile(Step &step, bool &IsFractionalCoefficients, bool &IsArtificial
 }
 
 // TODO: remove CurrentColumnIndex
-AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArtificialStep, int *CurrentColumnIndex) {
+AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArtificialStep) {
 	AlgorithmState state = UNDEFINED;
 	
 	for (int i = 0; i < matrix.ColNumber - 1; i++) {
@@ -271,7 +268,7 @@ Step SimplexStep(Step step) {
 	int CurrentRowIndex = -1;
 	float CurrentLead = -1;
 	
-	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, &CurrentColumnIndex);
+	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
 
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
@@ -411,7 +408,7 @@ void ArtificialBasis(Step step) {
 		return;
 	}
 
-	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, NULL);
+	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
 		step.IsCompleted = true;
@@ -605,7 +602,7 @@ void SimplexAlgorithm(Step step) {
 		return;
 	}
 
-	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep, NULL);
+	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
 	if (state == UNLIMITED_SOLUTION) {
 		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution is unlimited!");
 		step.IsCompleted = true;
