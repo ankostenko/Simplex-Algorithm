@@ -585,41 +585,9 @@ void DisplayStepOnScreen(Step &step) {
 	ImGui::Columns(1);
 }
 
-void DisplayAllArtificialSteps() {
-	if (ArtificialBasisSteps.size() != 0) {
-		if (ImGui::BeginTabBar("Solutions")) {
-			if (ImGui::BeginTabItem("Artificial Basis")) {
-				// First element skipped
-				for (int i = 1; i < ArtificialBasisSteps.size(); i++) {
-					DisplayStepOnScreen(ArtificialBasisSteps[i]);
-					ImGui::Separator();
-				}
-				ImGui::EndTabItem();
-			}
-			ImGui::EndTabBar();
-		}
-	}
-}
-
-void DisplayAllSimplexAlgorithmSteps() {
-	if (SimplexAlgorithmSteps.size() != 0) {
-		if (ImGui::BeginTabBar("Simplex Algorithm Solutions")) {
-			if (ImGui::BeginTabItem("Simplex Algorithm")) {
-				for (int i = 0; i < SimplexAlgorithmSteps.size(); i++) {
-					DisplayStepOnScreen(SimplexAlgorithmSteps[i]);
-					ImGui::Separator();
-				}
-				ImGui::EndTabItem();
-			}
-			ImGui::EndTabBar();
-		}
-	}
-}
-}
-
 void DisplaySteps(std::vector<Step> Steps, int StartIndex) {
 	if (Steps.size() != 0) {
-		if (ImGui::BeginTabBar("Simplex Algorithm Solutions")) {
+		if (ImGui::BeginTabBar((std::to_string(StartIndex) + std::string("Simplex Algorithm Solutions")).c_str())) {
 			if (ImGui::BeginTabItem("Simplex Algorithm")) {
 				for (int i = StartIndex; i < Steps.size(); i++) {
 					DisplayStepOnScreen(Steps[i]);
@@ -1130,10 +1098,9 @@ int main() {
 				}
 
 				// Display all steps that has been calculated
-				DisplayAllArtificialSteps();
+				DisplaySteps(ArtificialBasisSteps, 1);
 				ArtificialBasis(step);
 			} else {
-				// TODO: Explicit basis
 				if (SimplexAlgorithmSteps.size() == 0) {
 					step.RealMatrix = RealMatrix;
 					step.IsAutomatic = IsAutomatic;
@@ -1191,7 +1158,7 @@ int main() {
 					size_t LastSimplexAlgorithmElementIndex = SimplexAlgorithmSteps.size() - 1;
 					step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 				}
-				DisplayAllSimplexAlgorithmSteps();
+				DisplaySteps(SimplexAlgorithmSteps, 0);
 				SimplexAlgorithm(step);
 			}
 		}
