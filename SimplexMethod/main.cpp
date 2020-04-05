@@ -237,6 +237,7 @@ bool ReadFromFile(Step &step, bool &IsFractionalCoefficients, bool &IsArtificial
 	return true;
 }
 
+// TODO: remove CurrentColumnIndex
 AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArtificialStep, int *CurrentColumnIndex) {
 	AlgorithmState state = UNDEFINED;
 	
@@ -247,9 +248,6 @@ AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArti
 			for (int j = 0; j < matrix.RowNumber - 1; j++) {
 				if (matrix[j][i] > EPSILON) {
 					state = CONTINUE;
-					if (IsAutomatic && CurrentColumnIndex != NULL) {
-						*CurrentColumnIndex = i;
-					}
 					break;
 				}
 			}
@@ -291,10 +289,29 @@ Step SimplexStep(Step step) {
 		CurrentLead = FLT_MAX;
 		float ColumnMinimum = FLT_MAX;
 
+		// Find number of column of an available element
+		for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+			if (step.IsArtificialStep) {
+				bool IsRowBannedToSwap = false;
+				for (auto RowNumber : step.RowsBannedToSwap) {
+					if (RowNumber == i) {
+						IsRowBannedToSwap = true;
+					}
+				}
+				if (IsRowBannedToSwap) { continue; }
+			}
+				
+			for (int j = 0; j < step.RealMatrix.ColNumber - 1; j++) {
+				if (step.RealMatrix[i][j] > EPSILON) {
+					CurrentColumnIndex = j;
+					break;
+				}
+			}
+		}
+
 		// Choose any available lead element
 		for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
 			if (step.RealMatrix[i][CurrentColumnIndex] > EPSILON) {
-				assert(step.RealMatrix[i][CurrentColumnIndex] > EPSILON);
 				if (step.RealMatrix[i][step.RealMatrix.ColNumber - 1] / step.RealMatrix[i][CurrentColumnIndex] < ColumnMinimum) {
 					CurrentLead = step.RealMatrix[i][CurrentColumnIndex];
 					ColumnMinimum = step.RealMatrix[i][step.RealMatrix.ColNumber - 1] / step.RealMatrix[i][CurrentColumnIndex];
@@ -597,6 +614,7 @@ void DisplayAllSimplexAlgorithmSteps() {
 			ImGui::EndTabBar();
 		}
 	}
+}
 }
 
 void DisplaySteps(std::vector<Step> Steps, int StartIndex) {
