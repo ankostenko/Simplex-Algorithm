@@ -46,195 +46,6 @@ void PrintMatrix(Matrix& matrix) {
 	}
 }
 
-void SaveToFile(Step &step, bool IsFractionalCoefficients, bool IsArtificialBasis, std::vector<float> &RealExplicitBasis, std::vector<float> &RealTargetFunction, 
-							std::vector<Fraction> &FractionalExplicitBasis, std::vector<Fraction> &FractionalTargetFunction) {
-	FILE* file = fopen("ProblemConfiguration.txt", "w");
-	if (!file) { printf("Cannot open a file!\n"); }
-
-	/*
-	FILE FORMAT:
-		<number> - number of variables
-		<number> - number of limitations
-		F/R - fractional/real
-		E/A - explicit basis/artificial basis
-		Matrix of limitations
-		Target function
-	*/
-
-	if (!IsFractionalCoefficients) {
-		std::string nv = (std::to_string(step.RealMatrix.ColNumber) + std::string("\n"));
-		fprintf(file, nv.c_str());
-		std::string nl = (std::to_string(step.RealMatrix.RowNumber) + std::string("\n"));
-		fprintf(file, nl.c_str());
-		fprintf(file, "R\n");
-
-		if (IsArtificialBasis) {
-			fprintf(file, "A\n");
-		} else {
-			fprintf(file, "E\n");
-			for (int i = 0; i < RealExplicitBasis.size(); i++) {
-				fprintf(file, std::to_string(RealExplicitBasis[i]).c_str());
-				fprintf(file, " ");
-			}
-			fprintf(file, "\n");
-		}
-
-		fprintf(file, "\n");
-		for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
-			for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
-				fprintf(file, std::to_string(step.RealMatrix[i][j]).c_str());
-				fprintf(file, " ");
-			}
-			fprintf(file, "\n");
-		}
-		fprintf(file, "\n");
-		for (int i = 0; i < RealTargetFunction.size(); i++) {
-			fprintf(file, std::to_string(RealTargetFunction[i]).c_str());
-			fprintf(file, " ");
-		}
-	} else {
-		std::string nv = (std::to_string(step.FracMatrix.ColNumber) + std::string("\n"));
-		fprintf(file, nv.c_str());
-		std::string nl = (std::to_string(step.FracMatrix.RowNumber) + std::string("\n"));
-		fprintf(file, nl.c_str());
-		fprintf(file, "F\n");
-
-		if (IsArtificialBasis) {
-			fprintf(file, "A\n");
-		} else {
-			fprintf(file, "E\n");
-			for (int i = 0; i < FractionalExplicitBasis.size(); i++) {
-				fprintf(file, (std::to_string(FractionalExplicitBasis[i].numerator) + std::string("/") + std::to_string(FractionalExplicitBasis[i].denominator)).c_str());
-				fprintf(file, " ");
-			}
-			fprintf(file, "\n");
-		}
-
-		fprintf(file, "\n");
-		for (int i = 0; i < step.FracMatrix.RowNumber; i++) {
-			for (int j = 0; j < step.FracMatrix.ColNumber; j++) {
-				fprintf(file, (std::to_string(step.FracMatrix[i][j].numerator) + std::string("/") + std::to_string(step.FracMatrix[i][j].denominator)).c_str());
-				fprintf(file, " ");
-			}
-			fprintf(file, "\n");
-		}
-		fprintf(file, "\n");
-		for (int i = 0; i < FractionalTargetFunction.size(); i++) {
-			fprintf(file, (std::to_string(FractionalTargetFunction[i].numerator) + std::string("/") + std::to_string(FractionalTargetFunction[i].denominator)).c_str());
-			fprintf(file, " ");
-		}
-	}
-	fclose(file);
-}
-
-bool ReadFromFile(Step &step, bool &IsFractionalCoefficients, bool &IsArtificialBasis, std::vector<float>& RealExplicitBasis, std::vector<float>& RealTargetFunction,
-						std::vector<Fraction>& FractionalExplicitBasis, std::vector<Fraction>& FractionalTargetFunction) {
-	FILE* file = fopen("ProblemConfiguration.txt", "r");
-	if (!file) { printf("Cannot open a file!\n"); }
-
-	/*
-	FILE FORMAT:
-		<number> - number of variables
-		<number> - number of limitations
-		F/R - fractional/real
-		E/A - explicit basis/artificial basis
-		Matrix of limitations
-		Target function
-	*/
-
-	int NumberOfVariables = -1;
-	int ret = fscanf(file, "%d", &NumberOfVariables);
-	if (ret == EOF || ret == EILSEQ) { return false; }
-
-	int NumberOfLimitations = -1;
-	ret = fscanf(file, "%d", &NumberOfLimitations);
-	if (ret == EOF || ret == EILSEQ) { return false; }
-
-	char FR[2];
-	ret = fscanf(file, "%s", FR);
-	if (ret == EOF || ret == EILSEQ) { return false; }
-
-	if (FR[0] == 'F') {
-		IsFractionalCoefficients = true;
-	} else if (FR[0] == 'R') {
-		IsFractionalCoefficients = false;
-	} else {
-		return false;
-	}
-
-	char EA[2];
-	ret = fscanf(file, "%s", EA);
-	if (ret == EOF || ret == EILSEQ) { return false; }
-
-	if (EA[0] == 'E') {
-		IsArtificialBasis = false;
-		if (IsFractionalCoefficients) {
-			for (int i = 0; i < NumberOfVariables; i++) {
-				int Numerator, Denominator;
-				ret = fscanf(file, "%d/%d", &Numerator, &Denominator);
-				if (ret == EOF || ret == EILSEQ) { return false; }
-
-				FractionalExplicitBasis.push_back(Fraction({Numerator, Denominator}));
-			}
-		} else {
-			for (int i = 0; i < NumberOfVariables; i++) {
-				float Coefficient;
-				ret = fscanf(file, "%f", &Coefficient);
-				if (ret == EOF || ret == EILSEQ) { return false; }
-
-				RealExplicitBasis.push_back(Coefficient);
-			}
-		}
-	} else if (EA[0] == 'A') {
-		IsArtificialBasis = true;
-	} else {
-		return false;
-	}
-
-	if (IsFractionalCoefficients) {
-		for (int Row = 0; Row < NumberOfLimitations; Row++) {
-			for (int Col = 0; Col < NumberOfVariables; Col++) {
-				int Numerator, Denominator;
-				ret = fscanf(file, "%d/%d", &Numerator, &Denominator);
-				if (ret == EOF || ret == EILSEQ) { return false; }
-
-				step.FracMatrix[Row][Col] = Fraction{ Numerator, Denominator };
-			}
-		}
-	} else {
-		for (int Row = 0; Row < NumberOfLimitations; Row++) {
-			for (int Col = 0; Col < NumberOfVariables; Col++) {
-				float Coefficient;
-				ret = fscanf(file, "%f", &Coefficient);
-				if (ret == EOF || ret == EILSEQ) { return false; }
-
-				step.RealMatrix[Row][Col] = Coefficient;
-			}
-		}
-	}
-
-	if (IsFractionalCoefficients) {
-		for (int i = 0; i < NumberOfVariables; i++) {
-			int Numerator, Denominator;
-			ret = fscanf(file, "%d/%d", &Numerator, &Denominator);
-			if (ret == EOF || ret == EILSEQ) { return false; }
-
-			FractionalTargetFunction[i] = Fraction{ Numerator, Denominator };
-		}
-	} else {
-		for (int i = 0; i < NumberOfVariables; i++) {
-			float Coefficient;
-			ret = fscanf(file, "%f", &Coefficient);
-			if (ret == EOF || ret == EILSEQ) { return false; }
-
-			RealTargetFunction[i] = Coefficient;
-		}
-	}
-
-	return true;
-}
-
-// TODO: remove CurrentColumnIndex
 AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArtificialStep) {
 	AlgorithmState state = UNDEFINED;
 	
@@ -263,12 +74,46 @@ AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArti
 	return state;
 }
 
-Step SimplexStep(Step step) {
+AlgorithmState CheckAlgorithmState(FractionalMatrix& matrix, bool IsAutomatic, bool IsArtificialStep) {
+	AlgorithmState state = UNDEFINED;
+
+	for (int i = 0; i < matrix.ColNumber - 1; i++) {
+		if (matrix[matrix.RowNumber - 1][i] < 0) {
+			state = UNDEFINED;
+			// Check if there is at least one positive element in a column
+			for (int j = 0; j < matrix.RowNumber - 1; j++) {
+				if (matrix[j][i] > 0) {
+					state = CONTINUE;
+					break;
+				}
+			}
+			if (state == UNDEFINED) {
+				state = UNLIMITED_SOLUTION;
+				break;
+			}
+		}
+	}
+
+	if (state == UNDEFINED) {
+		state = COMPLETED;
+	}
+
+	assert(state != UNDEFINED);
+	return state;
+}
+
+Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 	int CurrentColumnIndex = -1;
 	int CurrentRowIndex = -1;
-	float CurrentLead = -1;
-	
-	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
+	float RealCurrentLead = -1;
+	Fraction FracCurrentLead = Fraction(-1, 0);
+
+	AlgorithmState state = UNDEFINED;
+	if (IsFractionalCoefficients) {
+		state = CheckAlgorithmState(step.FracMatrix, step.IsAutomatic, step.IsArtificialStep);
+	} else {
+		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
+	}
 
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
@@ -279,78 +124,149 @@ Step SimplexStep(Step step) {
 		step.IsCompleted = true;
 		return step;
 	}
-	
+
 	// Choose lead element
 	if (step.IsAutomatic) {
-		CurrentRowIndex = -1;
-		CurrentLead = FLT_MAX;
-		float ColumnMinimum = FLT_MAX;
+		if (IsFractionalCoefficients) {
+			CurrentRowIndex = -1;
+			FracCurrentLead.numerator = INT32_MAX;
+			Fraction ColumnMinimum = Fraction(INT32_MAX, 1);
 
-		// Find number of column of an available element
-		for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
-			if (step.IsArtificialStep) {
-				bool IsRowBannedToSwap = false;
-				for (auto RowNumber : step.RowsBannedToSwap) {
-					if (RowNumber == i) {
-						IsRowBannedToSwap = true;
+			// Find number of column of an available element
+			for (int i = 0; i < step.FracMatrix.RowNumber - 1; i++) {
+				if (step.IsArtificialStep) {
+					bool IsRowBannedToSwap = false;
+					for (auto RowNumber : step.RowsBannedToSwap) {
+						if (RowNumber == i) {
+							IsRowBannedToSwap = true;
+						}
+					}
+					if (IsRowBannedToSwap) { continue; }
+				}
+
+				for (int j = 0; j < step.FracMatrix.ColNumber - 1; j++) {
+					if (step.FracMatrix[i][j] > 0) {
+						CurrentColumnIndex = j;
+						break;
 					}
 				}
-				if (IsRowBannedToSwap) { continue; }
 			}
-				
-			for (int j = 0; j < step.RealMatrix.ColNumber - 1; j++) {
-				if (step.RealMatrix[i][j] > EPSILON) {
-					CurrentColumnIndex = j;
-					break;
+
+			// Choose any available lead element
+			for (int i = 0; i < step.FracMatrix.RowNumber - 1; i++) {
+				if (step.FracMatrix[i][CurrentColumnIndex] > 0) {
+					if (step.FracMatrix[i][step.FracMatrix.ColNumber - 1] / step.FracMatrix[i][CurrentColumnIndex] < ColumnMinimum) {
+						FracCurrentLead = step.FracMatrix[i][CurrentColumnIndex];
+						ColumnMinimum = step.FracMatrix[i][step.FracMatrix.ColNumber - 1] / step.FracMatrix[i][CurrentColumnIndex];
+						CurrentRowIndex = i;
+					}
 				}
 			}
-		}
+		} else {
+			CurrentRowIndex = -1;
+			RealCurrentLead = FLT_MAX;
+			float ColumnMinimum = FLT_MAX;
 
-		// Choose any available lead element
-		for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
-			if (step.RealMatrix[i][CurrentColumnIndex] > EPSILON) {
-				if (step.RealMatrix[i][step.RealMatrix.ColNumber - 1] / step.RealMatrix[i][CurrentColumnIndex] < ColumnMinimum) {
-					CurrentLead = step.RealMatrix[i][CurrentColumnIndex];
-					ColumnMinimum = step.RealMatrix[i][step.RealMatrix.ColNumber - 1] / step.RealMatrix[i][CurrentColumnIndex];
-					CurrentRowIndex = i;
+			// Find number of column of an available element
+			for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+				if (step.IsArtificialStep) {
+					bool IsRowBannedToSwap = false;
+					for (auto RowNumber : step.RowsBannedToSwap) {
+						if (RowNumber == i) {
+							IsRowBannedToSwap = true;
+						}
+					}
+					if (IsRowBannedToSwap) { continue; }
+				}
+
+				for (int j = 0; j < step.RealMatrix.ColNumber - 1; j++) {
+					if (step.RealMatrix[i][j] > EPSILON) {
+						CurrentColumnIndex = j;
+						break;
+					}
+				}
+			}
+
+			// Choose any available lead element
+			for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+				if (step.RealMatrix[i][CurrentColumnIndex] > EPSILON) {
+					if (step.RealMatrix[i][step.RealMatrix.ColNumber - 1] / step.RealMatrix[i][CurrentColumnIndex] < ColumnMinimum) {
+						RealCurrentLead = step.RealMatrix[i][CurrentColumnIndex];
+						ColumnMinimum = step.RealMatrix[i][step.RealMatrix.ColNumber - 1] / step.RealMatrix[i][CurrentColumnIndex];
+						CurrentRowIndex = i;
+					}
 				}
 			}
 		}
 	} else {
 		CurrentColumnIndex = step.LeadElementRC.Column;
 		CurrentRowIndex = step.LeadElementRC.Row;
-		CurrentLead = step.RealMatrix[step.LeadElementRC.Row][step.LeadElementRC.Column];
+		if (IsFractionalCoefficients) {
+			FracCurrentLead = step.FracMatrix[step.LeadElementRC.Row][step.LeadElementRC.Column];
+		} else {
+			RealCurrentLead = step.RealMatrix[step.LeadElementRC.Row][step.LeadElementRC.Column];
+		}
 	}
 
 	assert(CurrentRowIndex != -1);
 	assert(CurrentColumnIndex != -1);
-	assert(CurrentLead != -1);
-
-	// Lead element is equal to 1 / Lead
-	step.RealMatrix[CurrentRowIndex][CurrentColumnIndex] = 1 / CurrentLead;
-
-	// Divide Row by lead
-	for (int i = 0; i < step.RealMatrix.ColNumber; i++) {
-		if (i == CurrentColumnIndex) { continue; }
-		step.RealMatrix[CurrentRowIndex][i] /= CurrentLead;
+	if (IsFractionalCoefficients) {
+		assert(FracCurrentLead.numerator != -1);
+	} else {
+		assert(RealCurrentLead != -1);
 	}
 
-	// Divide Column by negative lead
-	for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
-		if (i == CurrentRowIndex) { continue; }
-		step.RealMatrix[i][CurrentColumnIndex] /= -CurrentLead;
-	}
+	if (IsFractionalCoefficients) {
+		// Lead element is equal to 1 / Lead
+		step.FracMatrix[CurrentRowIndex][CurrentColumnIndex] = Fraction(1, 1) / FracCurrentLead;
 
-	// Subtract all other rows by lead row
-	for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
-		if (i == CurrentRowIndex) { continue; }
-		for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
-			if (j == CurrentColumnIndex) { continue; }
-			step.RealMatrix[i][j] -= (-1) * CurrentLead * step.RealMatrix[i][CurrentColumnIndex] * step.RealMatrix[CurrentRowIndex][j];
+		// Divide Row by lead
+		for (int i = 0; i < step.FracMatrix.ColNumber; i++) {
+			if (i == CurrentColumnIndex) { continue; }
+			step.FracMatrix[CurrentRowIndex][i] = step.FracMatrix[CurrentRowIndex][i] / FracCurrentLead;
+		}
+
+		// Divide Column by negative lead
+		for (int i = 0; i < step.FracMatrix.RowNumber; i++) {
+			if (i == CurrentRowIndex) { continue; }
+			step.FracMatrix[i][CurrentColumnIndex] = step.FracMatrix[i][CurrentColumnIndex] / (-FracCurrentLead);
+		}
+
+		// Subtract all other rows by lead row
+		for (int i = 0; i < step.FracMatrix.RowNumber; i++) {
+			if (i == CurrentRowIndex) { continue; }
+			for (int j = 0; j < step.FracMatrix.ColNumber; j++) {
+				if (j == CurrentColumnIndex) { continue; }
+				step.FracMatrix[i][j] = step.FracMatrix[i][j] - FracCurrentLead * step.FracMatrix[i][CurrentColumnIndex] * step.FracMatrix[CurrentRowIndex][j] * (-1);
+			}
+		}
+	} else {
+		// Lead element is equal to 1 / Lead
+		step.RealMatrix[CurrentRowIndex][CurrentColumnIndex] = 1 / RealCurrentLead;
+
+		// Divide Row by lead
+		for (int i = 0; i < step.RealMatrix.ColNumber; i++) {
+			if (i == CurrentColumnIndex) { continue; }
+			step.RealMatrix[CurrentRowIndex][i] /= RealCurrentLead;
+		}
+
+		// Divide Column by negative lead
+		for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
+			if (i == CurrentRowIndex) { continue; }
+			step.RealMatrix[i][CurrentColumnIndex] /= -RealCurrentLead;
+		}
+
+		// Subtract all other rows by lead row
+		for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
+			if (i == CurrentRowIndex) { continue; }
+			for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
+				if (j == CurrentColumnIndex) { continue; }
+				step.RealMatrix[i][j] -= (-1) * RealCurrentLead * step.RealMatrix[i][CurrentColumnIndex] * step.RealMatrix[CurrentRowIndex][j];
+			}
 		}
 	}
 
-	Step NewStep(step.RealMatrix);
+	Step NewStep(step.RealMatrix, step.FracMatrix);
 	NewStep = step;
 	NewStep.StepID += 1;
 	NewStep.StepChosenRC.Row = CurrentRowIndex;
@@ -364,6 +280,16 @@ void MakeArtificialFunctionCoefficients(Matrix& matrix) {
 		float ColumnSum = 0.0f;
 		for (int j = 0; j < matrix.RowNumber - 1; j++) {
 			ColumnSum += matrix[j][i];
+		}
+		matrix[matrix.RowNumber - 1][i] = -ColumnSum;
+	}
+}
+
+void MakeArtificialFunctionCeofficients(FractionalMatrix &matrix) {
+	for (int i = 0; i < matrix.ColNumber; i++) {
+		Fraction ColumnSum = Fraction(0, 1);
+		for (int j = 0; j < matrix.RowNumber - 1; j++) {
+			ColumnSum = ColumnSum + matrix[j][i];
 		}
 		matrix[matrix.RowNumber - 1][i] = -ColumnSum;
 	}
@@ -402,13 +328,51 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<float> &Re
 	step.RealMatrix[step.RealMatrix.RowNumber - 1][step.RealMatrix.ColNumber - 1] = -ColumnSum;
 }
 
+void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>& FracTargetFunction) {
+	FractionalMatrix TargetFunctionCoefficientsMatrix(step.FracMatrix);
+
+	// Copy table one to one multiplying basis rows on coefficients of target function
+	for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+		for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
+			if (j < step.RealMatrix.ColNumber - 1) {
+				TargetFunctionCoefficientsMatrix[i][j] = FracTargetFunction[step.NumbersOfVariables[i] - 1] * step.FracMatrix[i][j] * (-1);
+			} else {
+				TargetFunctionCoefficientsMatrix[i][j] = FracTargetFunction[step.NumbersOfVariables[i] - 1] * step.FracMatrix[i][j];
+			}
+		}
+	}
+
+	// Fill new target function coefficients
+	for (int i = 0; i < TargetFunctionCoefficientsMatrix.ColNumber - 1; i++) {
+		Fraction ColumnSum = Fraction(0, 1);
+		for (int j = 0; j < TargetFunctionCoefficientsMatrix.RowNumber - 1; j++) {
+			ColumnSum += TargetFunctionCoefficientsMatrix[j][i];
+		}
+		ColumnSum += FracTargetFunction[step.NumbersOfVariables[i + step.RealMatrix.RowNumber - 1] - 1];
+		step.FracMatrix[step.RealMatrix.RowNumber - 1][i] = ColumnSum;
+	}
+
+	// Free coefficient
+	Fraction ColumnSum = Fraction(0, 1);
+	for (int i = 0; i < TargetFunctionCoefficientsMatrix.RowNumber - 1; i++) {
+		ColumnSum += TargetFunctionCoefficientsMatrix[i][TargetFunctionCoefficientsMatrix.ColNumber - 1];
+	}
+	ColumnSum += FracTargetFunction[FracTargetFunction.size() - 1];
+	step.FracMatrix[step.RealMatrix.RowNumber - 1][step.RealMatrix.ColNumber - 1] = -ColumnSum;
+}
+
 RowAndColumn CurrentLeadPos;
-void ArtificialBasis(Step step) {
+void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 	if (step.IsArtificialStep && step.IsCompleted) {
 		return;
 	}
 
-	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
+	AlgorithmState state = UNDEFINED;
+	if (IsFractionalCoefficients) {
+		state = CheckAlgorithmState(step.FracMatrix, step.IsAutomatic, step.IsArtificialStep);
+	} else {
+		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
+	}
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
 		step.IsCompleted = true;
@@ -418,57 +382,100 @@ void ArtificialBasis(Step step) {
 	}
 
 	// Choose lead element
-	std::vector<std::pair<float, int>> MinimumAndRowIndex;
 	if (!step.IsAutomatic) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
 		static int Column = 0;
 		// Pair of id and column number
 		std::vector<RowAndColumn> Leads;
-		for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-			CurrentRowIndex = -1;
-			float CurrentLead = FLT_MAX;
-			float ColumnMinimum = FLT_MAX;
-			MinimumAndRowIndex.clear();
-			if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-				for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
-						if (step.RealMatrix[j][i] > 0) {
-							if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] <= ColumnMinimum + EPSILON) {
-								ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
-								CurrentLead = step.RealMatrix[j][i];
+		if (IsFractionalCoefficients) {
+			std::vector<std::pair<Fraction, int>> MinimumAndRowIndex;
+			for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
+				CurrentRowIndex = -1;
+				Fraction CurrentLead =   Fraction(INT32_MAX, 1);
+				Fraction ColumnMinimum = Fraction(INT32_MAX, 1);
+				MinimumAndRowIndex.clear();
+				if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
+					for (int j = 0; j < step.FracMatrix.RowNumber - 1; j++) {
+						if (step.FracMatrix[j][i] > 0) {
+							if (step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i] <= ColumnMinimum) {
+								ColumnMinimum = step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i];
+								CurrentLead = step.FracMatrix[j][i];
 								CurrentRowIndex = j;
 								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
 							}
 						}
-				}
-			}
-
-			if (CurrentRowIndex != -1) {
-				// Delete all elements that are not minimum
-				// There can be more than one minimum
-				for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
-					auto MR = MinimumAndRowIndex[i];
-					if (fabs(MR.first - ColumnMinimum) > EPSILON) {
-						MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-						i = 0;
 					}
 				}
 
-				for (std::pair<float, int> MR : MinimumAndRowIndex) {
-					bool IsRowBanned = false;
-					for (auto row : step.RowsBannedToSwap) {
-						if (row == MR.second) {
-							IsRowBanned = true;
+				if (CurrentRowIndex != -1) {
+					for (std::pair<Fraction, int> MR : MinimumAndRowIndex) {
+						bool IsRowBanned = false;
+						for (auto row : step.RowsBannedToSwap) {
+							if (row == MR.second) {
+								IsRowBanned = true;
+							}
+						}
+
+						if (!IsRowBanned) {
+							if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
+								ImGui::PushID(i);
+								ImGui::RadioButton((std::to_string(step.FracMatrix[CurrentRowIndex][i].numerator) + std::string("/") + 
+									std::to_string(step.FracMatrix[CurrentRowIndex][i].denominator)).c_str(), &Column, i); ImGui::SameLine();
+								ImGui::PopID();
+								Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+							}
 						}
 					}
+				}
+			}
+		} else {
+			std::vector<std::pair<float, int>> MinimumAndRowIndex;
+			for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
+				CurrentRowIndex = -1;
+				float CurrentLead = FLT_MAX;
+				float ColumnMinimum = FLT_MAX;
+				MinimumAndRowIndex.clear();
+				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
+					for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
+							if (step.RealMatrix[j][i] > 0) {
+								if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] <= ColumnMinimum + EPSILON) {
+									ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
+									CurrentLead = step.RealMatrix[j][i];
+									CurrentRowIndex = j;
+									MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
+								}
+							}
+					}
+				}
 
-					if (!IsRowBanned) {
-						if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-							ImGui::PushID(i);
-							ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
-							ImGui::PopID();
-							Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
-							break;
+				if (CurrentRowIndex != -1) {
+					// Delete all elements that are not minimum
+					// There can be more than one minimum
+					//for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+					//	auto MR = MinimumAndRowIndex[i];
+					//	if (fabs(MR.first - ColumnMinimum) > EPSILON) {
+					//		MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+					//		i = 0;
+					//	}
+					//}
+
+					for (std::pair<float, int> MR : MinimumAndRowIndex) {
+						bool IsRowBanned = false;
+						for (auto row : step.RowsBannedToSwap) {
+							if (row == MR.second) {
+								IsRowBanned = true;
+							}
+						}
+
+						if (!IsRowBanned) {
+							if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
+								ImGui::PushID(i);
+								ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
+								ImGui::PopID();
+								Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+								//break;
+							}
 						}
 					}
 				}
@@ -505,7 +512,7 @@ void ArtificialBasis(Step step) {
 		for (int iteration = 0; iteration < step.RealMatrix.RowNumber; iteration++) {
 			PrintMatrix(step.RealMatrix);
 
-			Step NewStep = SimplexStep(step);
+			Step NewStep = SimplexStep(step, IsFractionalCoefficients);
 			
 			if (NewStep.IsCompleted) {
 				break;
@@ -514,13 +521,21 @@ void ArtificialBasis(Step step) {
 			// Change order of variables in the array of variables
 			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(NewStep.RealMatrix.RowNumber - 1) + NewStep.StepChosenRC.Column]);
 			NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (NewStep.RealMatrix.RowNumber - 1) + NewStep.StepChosenRC.Column);
-			NewStep.RealMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
-			printf("%d) Col: %d Row: %d\n", iteration, NewStep.StepChosenRC.Column, NewStep.StepChosenRC.Row);
-			PrintMatrix(NewStep.RealMatrix);
+			if (IsFractionalCoefficients) {
+				NewStep.FracMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
+			} else {
+				NewStep.RealMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
+			}
 
 			// Disables "confirm" button
-			if (fabs(NewStep.RealMatrix[NewStep.RealMatrix.RowNumber - 1][NewStep.RealMatrix.ColNumber - 1]) < EPSILON) {
-				NewStep.IsCompleted = true;
+			if (IsFractionalCoefficients) {
+				if (NewStep.FracMatrix[NewStep.FracMatrix.RowNumber - 1][NewStep.FracMatrix.ColNumber - 1] == Fraction(0, 1)) {
+					NewStep.IsCompleted = true;
+				}
+			} else {
+				if (fabs(NewStep.RealMatrix[NewStep.RealMatrix.RowNumber - 1][NewStep.RealMatrix.ColNumber - 1]) < EPSILON) {
+					NewStep.IsCompleted = true;
+				}
 			}
 
 			if (!NewStep.IsAutomatic) {
@@ -534,60 +549,101 @@ void ArtificialBasis(Step step) {
 	}
 }
 
-void DisplayStepOnScreen(Step &step) {
+void DisplayStepOnScreen(Step &step, bool IsFractionalCoefficients) {
 	ImDrawList* DrawList = ImGui::GetWindowDrawList();
 	
 	ImGui::NewLine();
 	ImGui::Separator();
 	ImGui::NewLine();
 
-	ImGui::Columns(step.RealMatrix.ColNumber + 1);
-	
-	ImGui::Text((std::string("#") + std::to_string(step.StepID)).c_str());
-	ImGui::NextColumn();
+	if (IsFractionalCoefficients) {
+		ImGui::Columns(step.FracMatrix.ColNumber + 1);
 
-	for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-		ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[(step.RealMatrix.RowNumber - 1) + i])).c_str());
+		ImGui::Text((std::string("#") + std::to_string(step.StepID)).c_str());
 		ImGui::NextColumn();
-	}
-	ImGui::NextColumn();
-	ImGui::Separator();
-	for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
-		// Do not display variable name for the last row
-		if (i < step.RealMatrix.RowNumber - 1) {
-			ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[i])).c_str());
+
+		for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
+			ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[(step.FracMatrix.RowNumber - 1) + i])).c_str());
 			ImGui::NextColumn();
 		}
-		for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
-			if (j == 0 && i == step.RealMatrix.RowNumber - 1) {
+		ImGui::NextColumn();
+		ImGui::Separator();
+		for (int i = 0; i < step.FracMatrix.RowNumber; i++) {
+			// Do not display variable name for the last row
+			if (i < step.FracMatrix.RowNumber - 1) {
+				ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[i])).c_str());
 				ImGui::NextColumn();
 			}
+			for (int j = 0; j < step.FracMatrix.ColNumber; j++) {
+				if (j == 0 && i == step.FracMatrix.RowNumber - 1) {
+					ImGui::NextColumn();
+				}
 
-			// Fill with a color chosen cell
-			if ((!step.IsCompleted) && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
-				float width = ImGui::GetColumnWidth();
-				float height = ImGui::GetTextLineHeight();
+				// Fill with a color chosen cell
+				if ((!step.IsCompleted) && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
+					float width = ImGui::GetColumnWidth();
+					float height = ImGui::GetTextLineHeight();
 
-				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
-				DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
+					ImVec2 CursorPos = ImGui::GetCursorScreenPos();
+					DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
+				}
+
+				ImGui::Text((std::to_string(step.FracMatrix[i][j].numerator) + std::string("/") + std::to_string(step.FracMatrix[i][j].denominator)).c_str());
+				ImGui::NextColumn();
 			}
-			
-			ImGui::Text(std::to_string(step.RealMatrix[i][j]).c_str());
+			if (i != step.FracMatrix.RowNumber - 1) {
+				ImGui::Separator();
+			}
+		}
+	} else {
+		ImGui::Columns(step.RealMatrix.ColNumber + 1);
+		
+		ImGui::Text((std::string("#") + std::to_string(step.StepID)).c_str());
+		ImGui::NextColumn();
+
+		for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
+			ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[(step.RealMatrix.RowNumber - 1) + i])).c_str());
 			ImGui::NextColumn();
 		}
-		if (i != step.RealMatrix.RowNumber - 1) {
-			ImGui::Separator();
+		ImGui::NextColumn();
+		ImGui::Separator();
+		for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
+			// Do not display variable name for the last row
+			if (i < step.RealMatrix.RowNumber - 1) {
+				ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[i])).c_str());
+				ImGui::NextColumn();
+			}
+			for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
+				if (j == 0 && i == step.RealMatrix.RowNumber - 1) {
+					ImGui::NextColumn();
+				}
+
+				// Fill with a color chosen cell
+				if ((!step.IsCompleted) && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
+					float width = ImGui::GetColumnWidth();
+					float height = ImGui::GetTextLineHeight();
+
+					ImVec2 CursorPos = ImGui::GetCursorScreenPos();
+					DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
+				}
+				
+				ImGui::Text(std::to_string(step.RealMatrix[i][j]).c_str());
+				ImGui::NextColumn();
+			}
+			if (i != step.RealMatrix.RowNumber - 1) {
+				ImGui::Separator();
+			}
 		}
 	}
 	ImGui::Columns(1);
 }
 
-void DisplaySteps(std::vector<Step> Steps, int StartIndex) {
+void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoefficients) {
 	if (Steps.size() != 0) {
 		if (ImGui::BeginTabBar((std::to_string(StartIndex) + std::string("Simplex Algorithm Solutions")).c_str())) {
 			if (ImGui::BeginTabItem("Simplex Algorithm")) {
 				for (int i = StartIndex; i < Steps.size(); i++) {
-					DisplayStepOnScreen(Steps[i]);
+					DisplayStepOnScreen(Steps[i], IsFractionalCoefficients);
 					ImGui::Separator();
 				}
 				ImGui::EndTabItem();
@@ -597,7 +653,7 @@ void DisplaySteps(std::vector<Step> Steps, int StartIndex) {
 	}
 }
 
-void SimplexAlgorithm(Step step) {
+void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 	if (!step.IsArtificialStep && step.IsCompleted) {
 		return;
 	}
@@ -617,6 +673,7 @@ void SimplexAlgorithm(Step step) {
 		int CurrentRowIndex = -1;
 		static int Column = 0;
 		// Pair of id and column number
+		// TODO: Add multiple minimums support
 		std::vector<RowAndColumn> Leads;
 		for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
 			CurrentRowIndex = -1;
@@ -674,7 +731,7 @@ void SimplexAlgorithm(Step step) {
 		for (int iteration = 0; iteration < step.RealMatrix.RowNumber; iteration++) {
 			PrintMatrix(step.RealMatrix);
 
-			Step NewStep = SimplexStep(step);
+			Step NewStep = SimplexStep(step, IsFractionalCoefficients);
 
 			if (NewStep.IsCompleted) {
 				break;
@@ -682,8 +739,6 @@ void SimplexAlgorithm(Step step) {
 
 			// Change order of variables in the array of variables
 			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(NewStep.RealMatrix.RowNumber - 1) + NewStep.StepChosenRC.Column]);
-			printf("%d) Col: %d Row: %d\n", iteration, NewStep.StepChosenRC.Column, NewStep.StepChosenRC.Row);
-			PrintMatrix(NewStep.RealMatrix);
 
 			// Disables "confirm" button
 			if (fabs(NewStep.RealMatrix[NewStep.RealMatrix.RowNumber - 1][NewStep.RealMatrix.ColNumber - 1]) < EPSILON) {
@@ -797,6 +852,10 @@ Step ExplicitBasis(Step step, std::vector<float>& RealExplicitBasis, std::vector
 	return step;
 }
 
+void PrintFraction(Fraction frac) {
+	printf("\n%d/%d", frac.numerator, frac.denominator);
+}
+
 int main() {
 	// Problem characteristics
 	int NumberOfVariables;
@@ -812,8 +871,8 @@ int main() {
 	std::vector<Fraction> FractionalExplicitBasis(1);
 	std::vector<float> RealExplicitBasis(1);
 	Matrix RealMatrix(1, 1);
-	FractionalMatrix FractionalMatrix(1, 1);
-	Step step(RealMatrix);
+	FractionalMatrix FracMatrix(1, 1);
+	Step step(RealMatrix, FracMatrix);
 	ArtificialBasisSteps.push_back(step);
 
 	glfwInit();
@@ -900,22 +959,22 @@ int main() {
 			} else {
 				ImGui::PushID("Fractional Basis");
 				ImGui::PushID("Numerator");
-				for (int i = 0; i < FractionalMatrix.ColNumber - 1; i++) {
+				for (int i = 0; i < FracMatrix.ColNumber - 1; i++) {
 					ImGui::PushID(i);
 					ImGui::SetNextItemWidth(75);
 					ImGui::InputScalar("", ImGuiDataType_S32, &FractionalExplicitBasis.at(i).numerator);
-					if (i < FractionalMatrix.ColNumber - 1) { ImGui::SameLine(); }
+					if (i < FracMatrix.ColNumber - 1) { ImGui::SameLine(); }
 					ImGui::PopID();
 				}
 				ImGui::PopID();
 
 				ImGui::PushID("Denominator");
-				for (int i = 0; i < FractionalMatrix.ColNumber - 1; i++) {
+				for (int i = 0; i < FracMatrix.ColNumber - 1; i++) {
 					ImGui::PushID(i);
 					ImGui::SetNextItemWidth(75);
 					ImGui::InputScalar("", ImGuiDataType_U32, &FractionalExplicitBasis.at(i).denominator);
 					FractionalExplicitBasis.at(i).denominator = Clamp(FractionalExplicitBasis.at(i).denominator, 1, INT32_MAX);
-					if (i < FractionalMatrix.ColNumber - 1) { ImGui::SameLine(); }
+					if (i < FracMatrix.ColNumber - 1) { ImGui::SameLine(); }
 					ImGui::PopID();
 				}
 				ImGui::PopID();
@@ -947,7 +1006,7 @@ int main() {
 				RealExplicitBasis.resize(NumberOfVariables);
 			} else {
 				// UNDONE: +1 for function coefficients
-				FractionalMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables + 1);
+				FracMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables + 1);
 				// UNDONE: +1 if there is a constant
 				FractionalTargetFunction.resize(NumberOfVariables + 1);
 				FractionalExplicitBasis.resize(NumberOfVariables);
@@ -967,25 +1026,25 @@ int main() {
 				}
 			}
 		} else {
-			for (int i = 0; i < FractionalMatrix.RowNumber; i++) {
+			for (int i = 0; i < FracMatrix.RowNumber - 1; i++) {
 				ImGui::NewLine();
 				ImGui::PushID("Numerator");
-				for (int j = 0; j < FractionalMatrix.ColNumber; j++) {
-					ImGui::PushID(i * FractionalMatrix.ColNumber + j);
+				for (int j = 0; j < FracMatrix.ColNumber; j++) {
+					ImGui::PushID(i * FracMatrix.ColNumber + j);
 					ImGui::SetNextItemWidth(40);
-					ImGui::InputScalar("", ImGuiDataType_S32, &FractionalMatrix[i][j].numerator);
-					if (j < FractionalMatrix.ColNumber - 1) { ImGui::SameLine(); }
+					ImGui::InputScalar("", ImGuiDataType_S32, &FracMatrix[i][j].numerator);
+					if (j < FracMatrix.ColNumber - 1) { ImGui::SameLine(); }
 					ImGui::PopID();
 				}
 				ImGui::PopID();
 
 				ImGui::PushID("Denominator");
-				for (int j = 0; j < FractionalMatrix.ColNumber; j++) {
-					ImGui::PushID(i * FractionalMatrix.ColNumber + j);
+				for (int j = 0; j < FracMatrix.ColNumber; j++) {
+					ImGui::PushID(i * FracMatrix.ColNumber + j);
 					ImGui::SetNextItemWidth(40);
-					ImGui::InputScalar("", ImGuiDataType_U32, &FractionalMatrix[i][j].denominator);
-					if (j < FractionalMatrix.ColNumber - 1) { ImGui::SameLine(); }
-					FractionalMatrix[i][j].denominator = Clamp(FractionalMatrix[i][j].denominator, 1, INT32_MAX);
+					ImGui::InputScalar("", ImGuiDataType_U32, &FracMatrix[i][j].denominator);
+					if (j < FracMatrix.ColNumber - 1) { ImGui::SameLine(); }
+					FracMatrix[i][j].denominator = Clamp(FracMatrix[i][j].denominator, 1, INT32_MAX);
 					ImGui::PopID();
 				}
 				ImGui::PopID();
@@ -1073,18 +1132,35 @@ int main() {
 				step = ArtificialBasisSteps[LastElementIndex];
 				if (ArtificialBasisSteps.size() == 1) {
 					step.RealMatrix = RealMatrix;
+					step.FracMatrix = FracMatrix;
 					step.IsAutomatic = IsAutomatic;
 					step.IsCompleted = false;
 					step.IsArtificialStep = true;
 					// Artificial variables
-					for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
-						step.NumbersOfVariables.push_back(step.RealMatrix.ColNumber + i);
+					if (IsFractionalCoefficients) {
+						for (int i = 0; i < step.FracMatrix.RowNumber - 1; i++) {
+							step.NumbersOfVariables.push_back(step.FracMatrix.ColNumber + i);
+						}
+					} else {
+						for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+							step.NumbersOfVariables.push_back(step.RealMatrix.ColNumber + i);
+						}
 					}
 					// Variables
-					for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-						step.NumbersOfVariables.push_back(i + 1);
+					if (IsFractionalCoefficients) {
+						for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
+							step.NumbersOfVariables.push_back(i + 1);
+						}
+					} else {
+						for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
+							step.NumbersOfVariables.push_back(i + 1);
+						}
 					}
-					MakeArtificialFunctionCoefficients(step.RealMatrix);
+					if (IsFractionalCoefficients) {
+						MakeArtificialFunctionCeofficients(step.FracMatrix);
+					} else {
+						MakeArtificialFunctionCoefficients(step.RealMatrix);
+					}
 					ArtificialBasisSteps.push_back(step);
 				}
 
@@ -1095,8 +1171,8 @@ int main() {
 				}
 
 				// Display all steps that has been calculated
-				DisplaySteps(ArtificialBasisSteps, 1);
-				ArtificialBasis(step);
+				DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
+				ArtificialBasis(step, IsFractionalCoefficients);
 			} else {
 				if (SimplexAlgorithmSteps.size() == 0) {
 					step.RealMatrix = RealMatrix;
@@ -1123,7 +1199,7 @@ int main() {
 					step = ExplicitBasis(step, RealExplicitBasis, RealTargetFunction);
 					step.IsCompleted = true;
 					//ExplicitBasisSteps.push_back(step);
-					DisplaySteps(ExplicitBasisSteps, 0);
+					DisplaySteps(ExplicitBasisSteps, 0, IsFractionalCoefficients);
 				}
 				
 				if (SimplexAlgorithmSteps.size() != 0) {
@@ -1155,8 +1231,8 @@ int main() {
 					size_t LastSimplexAlgorithmElementIndex = SimplexAlgorithmSteps.size() - 1;
 					step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 				}
-				DisplaySteps(SimplexAlgorithmSteps, 0);
-				SimplexAlgorithm(step);
+				DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
+				SimplexAlgorithm(step, IsFractionalCoefficients);
 			}
 		}
 
