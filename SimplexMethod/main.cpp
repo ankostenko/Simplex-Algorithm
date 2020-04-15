@@ -505,6 +505,12 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 		}
 
 		if (!step.IsCompleted) {
+			// Resets column to first available element each new step
+			if (PreviousStepID != step.StepID) {
+				Column = Leads[0].Column;
+				PreviousStepID = step.StepID;
+			}
+
 			// Assign chosen row and column
 			CurrentLeadPos.Column = Column;
 			for (auto rc : Leads) {
@@ -710,12 +716,6 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 		int CurrentRowIndex = -1;
 		static int Column = 0;
 
-		// Resets column to zero each new step
-		if (PreviousStepID != step.StepID) {
-			Column = 0;
-			PreviousStepID = step.StepID;
-		}
-
 		// Pair of id and column number
 		// TODO: Add multiple minimums support
 		std::vector<RowAndColumn> Leads;
@@ -805,6 +805,12 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 		}
 
 		if (!step.IsCompleted) {
+			// Resets column to first available element each new step
+			if (PreviousStepID != step.StepID || step.StepID == 0) {
+				Column = Leads[0].Column;
+				PreviousStepID = step.StepID;
+			}
+
 			// Assign chosen row and column
 			CurrentLeadPos.Column = Column;
 			for (auto rc : Leads) {
@@ -1301,6 +1307,7 @@ int main() {
 				// Explicit Basis Steps
 				// TODO: Make explicit basis steps for rational coefficients
 				if (SimplexAlgorithmSteps.size() == 0) {
+					step.StepID = 0;
 					step.RealMatrix = RealMatrix;
 					step.FracMatrix = FracMatrix;
 					step.IsAutomatic = IsAutomatic;
@@ -1354,6 +1361,7 @@ int main() {
 						}
 					}
 
+					step.StepID = 0;
 					step.IsAutomatic = IsAutomatic;
 					step.IsCompleted = false;
 					step.IsArtificialStep = false;
