@@ -17,7 +17,7 @@ struct Fraction {
 	Fraction(int Num, int Denom) : numerator(Num), denominator(Denom) {}
 
 	void NormalizeFraction() {
-		if (denominator < 0) { denominator = -denominator; }
+		if (denominator < 0) { denominator = -denominator; numerator = -numerator; }
 
 		int CurGCD = abs(gcd(numerator, denominator));
 		numerator /= CurGCD;
@@ -25,9 +25,10 @@ struct Fraction {
 	}
 
 	Fraction operator*(float value) {
-		numerator *= value;
-		NormalizeFraction();
-		return Fraction(numerator, denominator);
+		int TempNumerator = numerator * value;
+		Fraction Result = Fraction(TempNumerator, denominator);
+		Result.NormalizeFraction();
+		return Result;
 	}
 
 	Fraction operator*(Fraction other) const {
@@ -63,6 +64,11 @@ struct Fraction {
 	}
 
 	bool operator==(Fraction other) {
+		// Making sure values that are equal to zero reliably compared. It is purely a safety check
+		if (numerator == 0 && other.numerator == 0) {
+			return true;
+		}
+		
 		int CurGCD = gcd(other.numerator, other.denominator);
 		other.numerator /= CurGCD;
 		other.denominator /= CurGCD;

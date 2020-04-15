@@ -78,6 +78,7 @@ AlgorithmState CheckAlgorithmState(FractionalMatrix& matrix, bool IsAutomatic, b
 	AlgorithmState state = UNDEFINED;
 
 	for (int i = 0; i < matrix.ColNumber - 1; i++) {
+		// Last row contains negative numbers
 		if (matrix[matrix.RowNumber - 1][i] < 0) {
 			state = UNDEFINED;
 			// Check if there is at least one positive element in a column
@@ -114,6 +115,7 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 	} else {
 		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
 	}
+	assert(state != UNDEFINED);
 
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
@@ -332,9 +334,9 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 	FractionalMatrix TargetFunctionCoefficientsMatrix(step.FracMatrix);
 
 	// Copy table one to one multiplying basis rows on coefficients of target function
-	for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
-		for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
-			if (j < step.RealMatrix.ColNumber - 1) {
+	for (int i = 0; i < step.FracMatrix.RowNumber - 1; i++) {
+		for (int j = 0; j < step.FracMatrix.ColNumber; j++) {
+			if (j < step.FracMatrix.ColNumber - 1) {
 				TargetFunctionCoefficientsMatrix[i][j] = FracTargetFunction[step.NumbersOfVariables[i] - 1] * step.FracMatrix[i][j] * (-1);
 			} else {
 				TargetFunctionCoefficientsMatrix[i][j] = FracTargetFunction[step.NumbersOfVariables[i] - 1] * step.FracMatrix[i][j];
@@ -348,8 +350,8 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 		for (int j = 0; j < TargetFunctionCoefficientsMatrix.RowNumber - 1; j++) {
 			ColumnSum += TargetFunctionCoefficientsMatrix[j][i];
 		}
-		ColumnSum += FracTargetFunction[step.NumbersOfVariables[i + step.RealMatrix.RowNumber - 1] - 1];
-		step.FracMatrix[step.RealMatrix.RowNumber - 1][i] = ColumnSum;
+		ColumnSum += FracTargetFunction[step.NumbersOfVariables[i + step.FracMatrix.RowNumber - 1] - 1];
+		step.FracMatrix[step.FracMatrix.RowNumber - 1][i] = ColumnSum;
 	}
 
 	// Free coefficient
@@ -358,11 +360,13 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 		ColumnSum += TargetFunctionCoefficientsMatrix[i][TargetFunctionCoefficientsMatrix.ColNumber - 1];
 	}
 	ColumnSum += FracTargetFunction[FracTargetFunction.size() - 1];
-	step.FracMatrix[step.RealMatrix.RowNumber - 1][step.RealMatrix.ColNumber - 1] = -ColumnSum;
+	step.FracMatrix[step.FracMatrix.RowNumber - 1][step.FracMatrix.ColNumber - 1] = -ColumnSum;
 }
 
 RowAndColumn CurrentLeadPos;
 void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
+	static int PreviousStepID = step.StepID;
+
 	if (step.IsArtificialStep && step.IsCompleted) {
 		return;
 	}
@@ -386,6 +390,13 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
 		static int Column = 0;
+
+		// Resets column to zero each new step
+		if (PreviousStepID != step.StepID) {
+			Column = 0;
+			PreviousStepID = step.StepID;
+		}
+
 		// Pair of id and column number
 		std::vector<RowAndColumn> Leads;
 		if (IsFractionalCoefficients) {
@@ -509,6 +520,12 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 	}
 
 	if (!step.IsWaitingForInput) {
+		int RowNumber = 0;
+		if (IsFractionalCoefficients) {
+			RowNumber = step.FracMatrix.RowNumber;
+		} else {
+			RowNumber = step.RealMatrix.RowNumber;
+		}
 		for (int iteration = 0; iteration < step.RealMatrix.RowNumber; iteration++) {
 			PrintMatrix(step.RealMatrix);
 
@@ -519,8 +536,8 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 			}
 
 			// Change order of variables in the array of variables
-			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(NewStep.RealMatrix.RowNumber - 1) + NewStep.StepChosenRC.Column]);
-			NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (NewStep.RealMatrix.RowNumber - 1) + NewStep.StepChosenRC.Column);
+			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(RowNumber - 1) + NewStep.StepChosenRC.Column]);
+			NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (RowNumber - 1) + NewStep.StepChosenRC.Column);
 			if (IsFractionalCoefficients) {
 				NewStep.FracMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
 			} else {
@@ -654,11 +671,20 @@ void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoef
 }
 
 void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
+	static int PreviousStepID = step.StepID;
+
 	if (!step.IsArtificialStep && step.IsCompleted) {
 		return;
 	}
+	
+	AlgorithmState state = UNDEFINED;
+	if (IsFractionalCoefficients) {
+		state = CheckAlgorithmState(step.FracMatrix, step.IsAutomatic, step.IsArtificialStep);
+	} else {
+		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
+	}
+	assert(state != UNDEFINED);
 
-	AlgorithmState state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
 	if (state == UNLIMITED_SOLUTION) {
 		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution is unlimited!");
 		step.IsCompleted = true;
@@ -672,36 +698,78 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
 		static int Column = 0;
+
+		// Resets column to zero each new step
+		if (PreviousStepID != step.StepID) {
+			Column = 0;
+			PreviousStepID = step.StepID;
+		}
+
 		// Pair of id and column number
 		// TODO: Add multiple minimums support
 		std::vector<RowAndColumn> Leads;
-		for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-			CurrentRowIndex = -1;
-			float CurrentLead = FLT_MAX;
-			float ColumnMinimum = FLT_MAX;
-			if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-				for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
-					if (step.RealMatrix[j][i] > 0) {
-						if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] < ColumnMinimum) {
-							ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
-							CurrentLead = step.RealMatrix[j][i];
-							CurrentRowIndex = j;
+		if (IsFractionalCoefficients) {
+			for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
+				CurrentRowIndex = -1;
+				Fraction CurrentLead =   Fraction(INT32_MAX, 1);
+				Fraction ColumnMinimum = Fraction(INT32_MAX, 1);
+				if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
+					for (int j = 0; j < step.FracMatrix.RowNumber - 1; j++) {
+						if (step.FracMatrix[j][i] > 0) {
+							if (step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i] < ColumnMinimum) {
+								ColumnMinimum = step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i];
+								CurrentLead = step.FracMatrix[j][i];
+								CurrentRowIndex = j;
+							}
 						}
 					}
 				}
-			}
 
-			if (state == CONTINUE && CurrentRowIndex != -1) {
-				Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+				if (state == CONTINUE && CurrentRowIndex != -1) {
+					Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+					if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
+						ImGui::PushID(i);
+						ImGui::RadioButton((std::to_string(step.FracMatrix[CurrentRowIndex][i].numerator) + 
+							std::string("/") + std::to_string(step.FracMatrix[CurrentRowIndex][i].denominator)).c_str(), &Column, i); ImGui::SameLine();
+						ImGui::PopID();
+					}
+				}
+			}
+		} else {
+			for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
+				CurrentRowIndex = -1;
+				float CurrentLead = FLT_MAX;
+				float ColumnMinimum = FLT_MAX;
 				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-					ImGui::PushID(i);
-					ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
-					ImGui::PopID();
+					for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
+						if (step.RealMatrix[j][i] > 0) {
+							if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] < ColumnMinimum) {
+								ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
+								CurrentLead = step.RealMatrix[j][i];
+								CurrentRowIndex = j;
+							}
+						}
+					}
+				}
+
+				if (state == CONTINUE && CurrentRowIndex != -1) {
+					// Push possible leading element
+					Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+					if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
+						ImGui::PushID(i);
+						ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
+						ImGui::PopID();
+					}
 				}
 			}
 		}
 
 		if (!step.IsCompleted) {
+			// If we still waiting for input we choose first availaible column 
+			if (step.IsWaitingForInput) {
+				Column = Leads[0].Column;
+			}
+
 			// Assign chosen row and column
 			CurrentLeadPos.Column = Column;
 			for (auto rc : Leads) {
@@ -728,7 +796,19 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 	}
 
 	if (!step.IsWaitingForInput) {
-		for (int iteration = 0; iteration < step.RealMatrix.RowNumber; iteration++) {
+		int RowNumber = 0;
+		int ColNumber = 0;
+		// Set appropiate RowNumber and ColNumber according to whether fractional matrix or not 
+		if (IsFractionalCoefficients) {
+			RowNumber = step.FracMatrix.RowNumber;
+			ColNumber = step.FracMatrix.ColNumber;
+		} else {
+			RowNumber = step.RealMatrix.RowNumber;
+			ColNumber = step.RealMatrix.ColNumber;
+		}
+
+
+		for (int iteration = 0; iteration < RowNumber; iteration++) {
 			PrintMatrix(step.RealMatrix);
 
 			Step NewStep = SimplexStep(step, IsFractionalCoefficients);
@@ -738,13 +818,20 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 			}
 
 			// Change order of variables in the array of variables
-			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(NewStep.RealMatrix.RowNumber - 1) + NewStep.StepChosenRC.Column]);
+			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(RowNumber - 1) + NewStep.StepChosenRC.Column]);
 
 			// Disables "confirm" button
-			if (fabs(NewStep.RealMatrix[NewStep.RealMatrix.RowNumber - 1][NewStep.RealMatrix.ColNumber - 1]) < EPSILON) {
-				NewStep.IsCompleted = true;
+			if (IsFractionalCoefficients) {
+				if (NewStep.FracMatrix[RowNumber - 1][ColNumber - 1] == Fraction(0, 1)) {
+					NewStep.IsCompleted = true;
+				}
+			} else {
+				if (fabs(NewStep.RealMatrix[RowNumber - 1][ColNumber - 1]) < EPSILON) {
+					NewStep.IsCompleted = true;
+				}
 			}
 
+			// If it is not automatic execution rise waiting for input flag
 			if (!NewStep.IsAutomatic) {
 				NewStep.IsWaitingForInput = true;
 				SimplexAlgorithmSteps.push_back(NewStep);
@@ -856,6 +943,7 @@ void PrintFraction(Fraction frac) {
 	printf("\n%d/%d", frac.numerator, frac.denominator);
 }
 
+// TODO: Fix Simplex Aglorithm Tab
 int main() {
 	// Problem characteristics
 	int NumberOfVariables;
@@ -1174,11 +1262,14 @@ int main() {
 				DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
 				ArtificialBasis(step, IsFractionalCoefficients);
 			} else {
+				// Explicit Basis Steps
+				// TODO: Make explicit basis steps for rational coefficients
 				if (SimplexAlgorithmSteps.size() == 0) {
 					step.RealMatrix = RealMatrix;
+					step.FracMatrix = FracMatrix;
 					step.IsAutomatic = IsAutomatic;
 					step.IsCompleted = false;
-					step.IsArtificialStep = true;
+					step.IsArtificialStep = false;
 					// TODO: Add input checks 
 					// [] Check if input vector doesn't lead to degenerate matrix
 					// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
@@ -1218,8 +1309,13 @@ int main() {
 					if (IsArtificialBasis) {
 						size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
 						step.RealMatrix = ArtificialBasisSteps[LastElementIndex].RealMatrix;
+						step.FracMatrix = ArtificialBasisSteps[LastElementIndex].FracMatrix;
 						step.NumbersOfVariables = ArtificialBasisSteps[LastElementIndex].NumbersOfVariables;
-						MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
+						if (IsFractionalCoefficients) {
+							MakeSimplexAlgorithmFunctionCoefficients(step, FractionalTargetFunction);
+						} else {
+							MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
+						}
 					}
 
 					step.IsAutomatic = IsAutomatic;
