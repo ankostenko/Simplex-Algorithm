@@ -420,6 +420,17 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 				}
 
 				if (CurrentRowIndex != -1) {
+					// Delete all elements that are not minimum
+					// There can be more than one minimum
+					// I keep all the minimums
+					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+						auto MR = MinimumAndRowIndex[i];
+						if (MR.first - ColumnMinimum > 0) {
+							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+							i = 0;
+						}
+					}
+
 					for (std::pair<Fraction, int> MR : MinimumAndRowIndex) {
 						bool IsRowBanned = false;
 						for (auto row : step.RowsBannedToSwap) {
@@ -463,13 +474,14 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 				if (CurrentRowIndex != -1) {
 					// Delete all elements that are not minimum
 					// There can be more than one minimum
-					//for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
-					//	auto MR = MinimumAndRowIndex[i];
-					//	if (fabs(MR.first - ColumnMinimum) > EPSILON) {
-					//		MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-					//		i = 0;
-					//	}
-					//}
+					// I keep all the minimums
+					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+						auto MR = MinimumAndRowIndex[i];
+						if (fabs(MR.first - ColumnMinimum) > EPSILON) {
+							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+							i = 0;
+						}
+					}
 
 					for (std::pair<float, int> MR : MinimumAndRowIndex) {
 						bool IsRowBanned = false;
@@ -485,7 +497,6 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 								ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
 								ImGui::PopID();
 								Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
-								//break;
 							}
 						}
 					}
@@ -709,10 +720,12 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 		// TODO: Add multiple minimums support
 		std::vector<RowAndColumn> Leads;
 		if (IsFractionalCoefficients) {
+			std::vector<std::pair<Fraction, int>> MinimumAndRowIndex;
 			for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
 				CurrentRowIndex = -1;
 				Fraction CurrentLead =   Fraction(INT32_MAX, 1);
 				Fraction ColumnMinimum = Fraction(INT32_MAX, 1);
+				MinimumAndRowIndex.clear();
 				if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
 					for (int j = 0; j < step.FracMatrix.RowNumber - 1; j++) {
 						if (step.FracMatrix[j][i] > 0) {
@@ -720,26 +733,41 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 								ColumnMinimum = step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i];
 								CurrentLead = step.FracMatrix[j][i];
 								CurrentRowIndex = j;
+								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
 							}
 						}
 					}
 				}
 
 				if (state == CONTINUE && CurrentRowIndex != -1) {
-					Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+					// Delete all elements that are not minimum
+					// There can be more than one minimum
+					// I keep all the minimums
+					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+						auto MR = MinimumAndRowIndex[i];
+						if (MR.first - ColumnMinimum > 0) {
+							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+							i = 0;
+						}
+					}
+
 					if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
 						ImGui::PushID(i);
 						ImGui::RadioButton((std::to_string(step.FracMatrix[CurrentRowIndex][i].numerator) + 
 							std::string("/") + std::to_string(step.FracMatrix[CurrentRowIndex][i].denominator)).c_str(), &Column, i); ImGui::SameLine();
 						ImGui::PopID();
+						// Push possible leading element
+						Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
 					}
 				}
 			}
 		} else {
+			std::vector<std::pair<float, int>> MinimumAndRowIndex;
 			for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
 				CurrentRowIndex = -1;
 				float CurrentLead = FLT_MAX;
 				float ColumnMinimum = FLT_MAX;
+				MinimumAndRowIndex.clear();
 				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
 					for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
 						if (step.RealMatrix[j][i] > 0) {
@@ -747,29 +775,36 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 								ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
 								CurrentLead = step.RealMatrix[j][i];
 								CurrentRowIndex = j;
+								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
 							}
 						}
 					}
 				}
 
 				if (state == CONTINUE && CurrentRowIndex != -1) {
-					// Push possible leading element
-					Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+					// Delete all elements that are not minimum
+					// There can be more than one minimum
+					// I keep all the minimums
+					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+						auto MR = MinimumAndRowIndex[i];
+						if (fabs(MR.first - ColumnMinimum) > EPSILON) {
+							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+							i = 0;
+						}
+					}
+					
 					if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
 						ImGui::PushID(i);
 						ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
 						ImGui::PopID();
+						// Push possible leading element
+						Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
 					}
 				}
 			}
 		}
 
 		if (!step.IsCompleted) {
-			// If we still waiting for input we choose first availaible column 
-			if (step.IsWaitingForInput) {
-				Column = Leads[0].Column;
-			}
-
 			// Assign chosen row and column
 			CurrentLeadPos.Column = Column;
 			for (auto rc : Leads) {
@@ -944,6 +979,7 @@ void PrintFraction(Fraction frac) {
 }
 
 // TODO: Fix Simplex Aglorithm Tab
+// BUG: When we choose lead element the program display at least one copy of each lead element
 int main() {
 	// Problem characteristics
 	int NumberOfVariables;
@@ -1270,7 +1306,7 @@ int main() {
 					step.IsAutomatic = IsAutomatic;
 					step.IsCompleted = false;
 					step.IsArtificialStep = false;
-					// TODO: Add input checks 
+					// TODO: Add input checks
 					// [] Check if input vector doesn't lead to degenerate matrix
 					// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
 					//		or drop this method and use artificial basis instead
