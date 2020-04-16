@@ -390,7 +390,7 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 		state = CheckAlgorithmState(step.FracMatrix, step.IsAutomatic, step.IsArtificialStep);
 	} else {
 		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
-	}
+	} 
 
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
@@ -627,8 +627,10 @@ void DisplayStepOnScreen(Step &step, bool IsFractionalCoefficients) {
 					ImGui::NextColumn();
 				}
 
+				AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, false);
+
 				// Fill with a color chosen cell
-				if ((!step.IsCompleted) && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
+				if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
 					float width = ImGui::GetColumnWidth();
 					float height = ImGui::GetTextLineHeight();
 
@@ -666,8 +668,10 @@ void DisplayStepOnScreen(Step &step, bool IsFractionalCoefficients) {
 					ImGui::NextColumn();
 				}
 
+				AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, false);
+
 				// Fill with a color chosen cell
-				if ((!step.IsCompleted) && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
+				if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
 					float width = ImGui::GetColumnWidth();
 					float height = ImGui::GetTextLineHeight();
 
@@ -759,7 +763,7 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 					// I keep all the minimums
 					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
 						auto MR = MinimumAndRowIndex[i];
-						if (MR.first - ColumnMinimum > 0) {
+						if (MR.first != ColumnMinimum) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
 							i = -1;
 						}
