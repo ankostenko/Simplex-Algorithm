@@ -68,6 +68,11 @@ AlgorithmState CheckAlgorithmState(Matrix &matrix, bool IsAutomatic, bool IsArti
 
 	if (state == UNDEFINED) {
 		state = COMPLETED;
+
+		// Check if system of equalities have solutions
+		if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1]  < -EPSILON) {
+			state = SOLUTION_DOESNT_EXIST;
+		}
 	}
 
 	assert(state != UNDEFINED);
@@ -97,6 +102,11 @@ AlgorithmState CheckAlgorithmState(FractionalMatrix& matrix, bool IsAutomatic, b
 
 	if (state == UNDEFINED) {
 		state = COMPLETED;
+
+		// Check if system of equalities have solutions
+		if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] < -EPSILON) {
+			state = SOLUTION_DOESNT_EXIST;
+		}
 	}
 
 	assert(state != UNDEFINED);
@@ -123,6 +133,10 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 		return step;
 	} else if (state == COMPLETED) {
 		printf("Algorithm is completed");
+		step.IsCompleted = true;
+		return step;
+	} else if (state == SOLUTION_DOESNT_EXIST) {
+		printf("Solution doesn't exist");
 		step.IsCompleted = true;
 		return step;
 	}
@@ -377,11 +391,15 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 	} else {
 		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
 	}
+
 	if (state == UNLIMITED_SOLUTION) {
 		printf("Solution is unlimited");
 		step.IsCompleted = true;
 	} else if (state == COMPLETED) {
 		printf("Algorithm is completed");
+		step.IsCompleted = true;
+	} else if (state == SOLUTION_DOESNT_EXIST) {
+		printf("Solution doesn't exist");
 		step.IsCompleted = true;
 	}
 
@@ -390,12 +408,6 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
 		static int Column = 0;
-
-		// Resets column to zero each new step
-		if (PreviousStepID != step.StepID) {
-			Column = 0;
-			PreviousStepID = step.StepID;
-		}
 
 		// Pair of id and column number
 		std::vector<RowAndColumn> Leads;
@@ -425,9 +437,9 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 					// I keep all the minimums
 					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
 						auto MR = MinimumAndRowIndex[i];
-						if (MR.first - ColumnMinimum > 0) {
+						if (MR.first == ColumnMinimum) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-							i = 0;
+							i = -1;
 						}
 					}
 
@@ -479,7 +491,7 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 						auto MR = MinimumAndRowIndex[i];
 						if (fabs(MR.first - ColumnMinimum) > EPSILON) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-							i = 0;
+							i = -1;
 						}
 					}
 
@@ -747,7 +759,7 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 						auto MR = MinimumAndRowIndex[i];
 						if (MR.first - ColumnMinimum > 0) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-							i = 0;
+							i = -1;
 						}
 					}
 
@@ -789,7 +801,7 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 						auto MR = MinimumAndRowIndex[i];
 						if (fabs(MR.first - ColumnMinimum) > EPSILON) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-							i = 0;
+							i = -1;
 						}
 					}
 					
@@ -985,7 +997,6 @@ void PrintFraction(Fraction frac) {
 }
 
 // TODO: Fix Simplex Aglorithm Tab
-// BUG: When we choose lead element the program display at least one copy of each lead element
 int main() {
 	// Problem characteristics
 	int NumberOfVariables;
