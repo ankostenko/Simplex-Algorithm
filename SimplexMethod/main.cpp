@@ -117,7 +117,7 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 	int CurrentColumnIndex = -1;
 	int CurrentRowIndex = -1;
 	float RealCurrentLead = -1;
-	Fraction FracCurrentLead = Fraction(-1, 0);
+	Fraction FracCurrentLead = Fraction(-1, 1);
 
 	AlgorithmState state = UNDEFINED;
 	if (IsFractionalCoefficients) {
@@ -437,7 +437,8 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 					// I keep all the minimums
 					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
 						auto MR = MinimumAndRowIndex[i];
-						if (MR.first == ColumnMinimum) {
+						// Check if a value not equal to minimum
+						if (MR.first != ColumnMinimum) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
 							i = -1;
 						}
@@ -489,6 +490,7 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 					// I keep all the minimums
 					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
 						auto MR = MinimumAndRowIndex[i];
+						// Check if a value not equal to minimum
 						if (fabs(MR.first - ColumnMinimum) > EPSILON) {
 							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
 							i = -1;

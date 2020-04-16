@@ -87,6 +87,18 @@ struct Fraction {
 		return ((numerator == other.numerator) && (denominator == other.denominator));
 	}
 
+	bool operator!=(Fraction other) const {
+		int TempNumerator = numerator;
+		int TempDenominator = denominator;
+
+		if (denominator != other.denominator) {
+			TempNumerator *= other.denominator;
+			other.numerator *= denominator;
+		}
+
+		return (TempNumerator != other.numerator);
+	}
+
 	bool operator<(Fraction other) const {
 		int TempNumerator = numerator;
 		int TempDenominator = denominator;
@@ -167,6 +179,7 @@ struct Fraction {
 		denominator = other.denominator;
 		return *this;
 	}
+
 };
 
 struct FractionalMatrix {
