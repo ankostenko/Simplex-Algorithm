@@ -522,6 +522,11 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 				}
 			}
 		}
+		// Solution doesn't exist if leads are empty
+		if (Leads.size() == 0) {
+			ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
+			step.IsCompleted = true;
+		}
 
 		if (!step.IsCompleted) {
 			// Resets column to first available element each new step
