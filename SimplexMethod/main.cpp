@@ -185,12 +185,6 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 			RealCurrentLead = FLT_MAX;
 			float ColumnMinimum = FLT_MAX;
 
-			for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][0] > EPSILON)
-				{ }
-
-			}
-
 			// Find number of column of an available element
 			for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
 				if (step.IsArtificialStep) {
@@ -409,6 +403,7 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 		printf("Algorithm is completed");
 		step.IsCompleted = true;
 	} else if (state == SOLUTION_DOESNT_EXIST) {
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
 		printf("Solution doesn't exist");
 		step.IsCompleted = true;
 	}

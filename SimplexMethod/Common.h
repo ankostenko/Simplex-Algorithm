@@ -105,6 +105,14 @@ struct Fraction {
 
 		if (denominator != other.denominator) {
 			TempNumerator *= other.denominator;
+			int TempOtherNumerator = other.numerator * denominator;
+			// Overflow handling
+			if (other.numerator > INT32_MAX / denominator) {
+				float ApproxValue = (float)numerator / denominator;
+				float ApproxOtherValue = (float)other.numerator / other.denominator;
+
+				return ApproxValue < ApproxOtherValue;
+			}
 			other.numerator *= denominator;
 		}
 
