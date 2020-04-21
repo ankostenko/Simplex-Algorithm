@@ -161,9 +161,11 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 				}
 
 				for (int j = 0; j < step.FracMatrix.ColNumber - 1; j++) {
-					if (step.FracMatrix[i][j] > 0) {
-						CurrentColumnIndex = j;
-						break;
+					if (step.FracMatrix[step.FracMatrix.RowNumber - 1][j] < 0) {
+						if (step.FracMatrix[i][j] > 0) {
+							CurrentColumnIndex = j;
+							break;
+						}
 					}
 				}
 			}
@@ -183,6 +185,12 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 			RealCurrentLead = FLT_MAX;
 			float ColumnMinimum = FLT_MAX;
 
+			for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
+				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][0] > EPSILON)
+				{ }
+
+			}
+
 			// Find number of column of an available element
 			for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
 				if (step.IsArtificialStep) {
@@ -196,9 +204,11 @@ Step SimplexStep(Step step, bool IsFractionalCoefficients) {
 				}
 
 				for (int j = 0; j < step.RealMatrix.ColNumber - 1; j++) {
-					if (step.RealMatrix[i][j] > EPSILON) {
-						CurrentColumnIndex = j;
-						break;
+					if (step.RealMatrix[step.RealMatrix.RowNumber - 1][j] < -EPSILON) {
+						if (step.RealMatrix[i][j] > EPSILON) {
+							CurrentColumnIndex = j;
+							break;
+						}
 					}
 				}
 			}
@@ -668,7 +678,7 @@ void DisplayStepOnScreen(Step &step, bool IsFractionalCoefficients) {
 					ImGui::NextColumn();
 				}
 
-				AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, false);
+				AlgorithmState state = CheckAlgorithmState(step.RealMatrix, false, false);
 
 				// Fill with a color chosen cell
 				if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
