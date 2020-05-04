@@ -61,15 +61,16 @@ template<typename VectorType, typename Proc> void InputVector(std::vector<Vector
 	PrintFunction(Size);
 	ImGui::Separator();
 	
-	
 	for (int i = 0; i < Size; i++) {
 		ImGui::PushID(i);
 		ImGui::SetNextItemWidth(75);
 
 		// Depeding on type of vector's element we decide how to handle input
 		if constexpr (std::is_same<VectorType, float>::value) {
+			// Real case
 			ImGui::InputScalar("", ImGuiDataType_Float, &Vector.at(i));
 		} else {
+			// Fractional case
 			Vector.at(i) = FractionInput(Vector.at(i));
 		}
 
@@ -102,10 +103,10 @@ template<typename MatrixType>void MatrixInput(MatrixType& matrix) {
 			ImGui::SetNextItemWidth(75);
 			// Depending on type of matrix we choose two different ways to handle input
 			if constexpr (std::is_same<MatrixType, Matrix>::value) {
-				// It is real values matrix
+				// Real case
 				ImGui::InputScalar("", ImGuiDataType_Float, &matrix[i][j]);
 			} else {
-				// It is fraction values matrix
+				// Fractional case
 				matrix[i][j] = FractionInput(matrix[i][j]);
 			}
 			if (j < matrix.ColNumber - 1) { ImGui::SameLine(); }

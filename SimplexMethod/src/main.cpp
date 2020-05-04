@@ -607,96 +607,69 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 	}
 }
 
-void DisplayStepOnScreen(Step& step, bool IsFractionalCoefficients) {
+template<typename MatrixType> void DisplayStepOnScreen(MatrixType &matrix, int StepID, std::vector<int> NumbersOfVariables) {
 	ImDrawList* DrawList = ImGui::GetWindowDrawList();
 
 	ImGui::NewLine();
 	ImGui::Separator();
 	ImGui::NewLine();
 
-	if (IsFractionalCoefficients) {
-		ImGui::Columns(step.FracMatrix.ColNumber + 1);
+	ImGui::Columns(matrix.ColNumber + 1);
 
-		ImGui::Text((std::string("#") + std::to_string(step.StepID)).c_str());
+	ImGui::Text((std::string("#") + std::to_string(StepID)).c_str());
+	ImGui::NextColumn();
+
+	for (int i = 0; i < matrix.ColNumber - 1; i++) {
+		ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[(matrix.RowNumber - 1) + i])).c_str());
 		ImGui::NextColumn();
-
-		for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
-			ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[(step.FracMatrix.RowNumber - 1) + i])).c_str());
+	}
+	ImGui::NextColumn();
+	ImGui::Separator();
+	for (int i = 0; i < matrix.RowNumber; i++) {
+		// Do not display variable name for the last row
+		if (i < matrix.RowNumber - 1) {
+			ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[i])).c_str());
 			ImGui::NextColumn();
 		}
-		ImGui::NextColumn();
-		ImGui::Separator();
-		for (int i = 0; i < step.FracMatrix.RowNumber; i++) {
-			// Do not display variable name for the last row
-			if (i < step.FracMatrix.RowNumber - 1) {
-				ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[i])).c_str());
+		for (int j = 0; j < matrix.ColNumber; j++) {
+			if (j == 0 && i == matrix.RowNumber - 1) {
 				ImGui::NextColumn();
 			}
-			for (int j = 0; j < step.FracMatrix.ColNumber; j++) {
-				if (j == 0 && i == step.FracMatrix.RowNumber - 1) {
-					ImGui::NextColumn();
-				}
 
-				AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, false);
+			// Checking algorithm state
+			AlgorithmState state = CheckAlgorithmState(matrix, false, false);
 
-				// Fill with a color chosen cell
-				if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
-					float width = ImGui::GetColumnWidth();
-					float height = ImGui::GetTextLineHeight();
+			// Fill with a color chosen cell
+			if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (StepID == ArtificialBasisSteps.size() - 2)) {
+				float width = ImGui::GetColumnWidth();
+				float height = ImGui::GetTextLineHeight();
 
-					ImVec2 CursorPos = ImGui::GetCursorScreenPos();
-					DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
-				}
-
-				ImGui::Text((std::to_string(step.FracMatrix[i][j].numerator) + std::string("/") + std::to_string(step.FracMatrix[i][j].denominator)).c_str());
-				ImGui::NextColumn();
+				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
+				DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
 			}
-			if (i != step.FracMatrix.RowNumber - 1) {
-				ImGui::Separator();
+
+			// Output differences
+			if constexpr (std::is_same<MatrixType, Matrix>::value) {
+				// Real case
+				ImGui::Text(std::to_string(matrix[i][j]).c_str());
+			} else {
+				// Fractional case
+				if (matrix[i][j].denominator != 1) {
+					// We display denominator if it doesn't equal to 1
+					ImGui::Text((std::to_string(matrix[i][j].numerator) + std::string("/") + std::to_string(matrix[i][j].denominator)).c_str());
+				} else {
+					// We don't display denominator if it equals to 1
+					ImGui::Text((std::to_string(matrix[i][j].numerator)).c_str());
+				}
 			}
-		}
-	} else {
-		ImGui::Columns(step.RealMatrix.ColNumber + 1);
 
-		ImGui::Text((std::string("#") + std::to_string(step.StepID)).c_str());
-		ImGui::NextColumn();
-
-		for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-			ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[(step.RealMatrix.RowNumber - 1) + i])).c_str());
 			ImGui::NextColumn();
 		}
-		ImGui::NextColumn();
-		ImGui::Separator();
-		for (int i = 0; i < step.RealMatrix.RowNumber; i++) {
-			// Do not display variable name for the last row
-			if (i < step.RealMatrix.RowNumber - 1) {
-				ImGui::Text((std::string("x") + std::to_string(step.NumbersOfVariables[i])).c_str());
-				ImGui::NextColumn();
-			}
-			for (int j = 0; j < step.RealMatrix.ColNumber; j++) {
-				if (j == 0 && i == step.RealMatrix.RowNumber - 1) {
-					ImGui::NextColumn();
-				}
-
-				AlgorithmState state = CheckAlgorithmState(step.RealMatrix, false, false);
-
-				// Fill with a color chosen cell
-				if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (step.StepID == ArtificialBasisSteps.size() - 2)) {
-					float width = ImGui::GetColumnWidth();
-					float height = ImGui::GetTextLineHeight();
-
-					ImVec2 CursorPos = ImGui::GetCursorScreenPos();
-					DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
-				}
-
-				ImGui::Text(std::to_string(step.RealMatrix[i][j]).c_str());
-				ImGui::NextColumn();
-			}
-			if (i != step.RealMatrix.RowNumber - 1) {
-				ImGui::Separator();
-			}
+		if (i != matrix.RowNumber - 1) {
+			ImGui::Separator();
 		}
 	}
+
 	ImGui::Columns(1);
 }
 
@@ -705,7 +678,11 @@ void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoef
 		if (ImGui::BeginTabBar((std::to_string(StartIndex) + std::string("Simplex Algorithm Solutions")).c_str())) {
 			if (ImGui::BeginTabItem("Simplex Algorithm")) {
 				for (int i = StartIndex; i < Steps.size(); i++) {
-					DisplayStepOnScreen(Steps[i], IsFractionalCoefficients);
+					if (IsFractionalCoefficients) {
+						DisplayStepOnScreen(Steps[i].FracMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
+					} else {
+						DisplayStepOnScreen(Steps[i].RealMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
+					}
 					ImGui::Separator();
 				}
 				ImGui::EndTabItem();
@@ -1269,7 +1246,7 @@ int main() {
 			
 			if (ShowSolution) {
 				ImGui::SameLine();
-				if (ImGui::Button(u8"Отменить")) {
+				if (ImGui::Button(u8"Отменить решение")) {
 					Step FirstStep = ArtificialBasisSteps[0];
 					ArtificialBasisSteps.clear();
 					ArtificialBasisSteps.push_back(FirstStep);
@@ -1283,6 +1260,7 @@ int main() {
 			ImGui::Text("Solution");
 
 			if (ShowSolution) {
+				// Artificial Basis Step
 				if (IsArtificialBasis) {
 					// Calculate next step of simplex algorithm
 					size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
@@ -1369,7 +1347,7 @@ int main() {
 				}
 
 				if (step.IsCompleted) {
-					if (ImGui::Button("Start Simplex Algorithm")) {
+					if (ImGui::Button(u8"Start Simplex Algorithm")) {
 						StartSimplexAlgorithm = true;
 					}
 				}
