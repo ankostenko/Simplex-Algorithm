@@ -607,6 +607,222 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 	}
 }
 
+template<typename MatrixType, typename ElementType> void ArtificialBasis(Step step) {
+	// Depending on type of matrix choose one of those to use
+	MatrixType matrix;// = (IS_SAME_TYPE(MatrixType, Matrix)) ? step.RealMatrix : step.FracMatrix;
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		matrix = step.RealMatrix;
+	} else {
+		matrix = step.FracMatrix;
+	}
+	
+	// Type-independent zero element
+	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
+	ElementType ZeroElement;// = (IS_SAME_TYPE(MatrixType, Matrix)) ? EPSILON : Fraction(0, 1);
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		ZeroElement = EPSILON;
+	} else {
+		ZeroElement = Fraction(0, 1);
+	}
+
+	static int PreviousStepID = step.StepID;
+
+	if (step.IsArtificialStep && step.IsCompleted) {
+		return;
+	}
+
+	AlgorithmState state = UNDEFINED;
+	state = CheckAlgorithmState(matrix, step.IsAutomatic, step.IsArtificialStep);
+
+	if (state == UNLIMITED_SOLUTION) {
+		printf("Solution is unlimited");
+		step.IsCompleted = true;
+	} else if (state == COMPLETED) {
+		printf("Algorithm is completed");
+		step.IsCompleted = true;
+	} else if (state == SOLUTION_DOESNT_EXIST) {
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
+		printf("Solution doesn't exist");
+		step.IsCompleted = true;
+	}
+
+	// Choose lead element
+	if (!step.IsAutomatic) {
+		ImGui::PushID("Choose Lead Element");
+		int CurrentRowIndex = -1;
+		static int Column = 0;
+		static int CurrentCellIndex = 0;
+
+		// Pair of id and column number
+		std::vector<RowAndColumn> Leads;
+		std::vector<std::pair<ElementType, int>> MinimumAndRowIndex;
+		for (int i = 0; i < matrix.ColNumber - 1; i++) {
+			CurrentRowIndex = -1;
+			// Assign Fraction of float type
+			ElementType CurrentLead  ;// = (IS_SAME_TYPE(ElementType, float)) ? FLT_MAX : Fraction(INT32_MAX, 1);
+			ElementType ColumnMinimum;// = (IS_SAME_TYPE(ElementType, float)) ? FLT_MAX : Fraction(INT32_MAX, 1);
+			if constexpr (IS_SAME_TYPE(ElementType, float)) {
+				CurrentLead = FLT_MAX;
+				ColumnMinimum = FLT_MAX;
+			} else {
+				CurrentLead = Fraction(0, 1);
+				ColumnMinimum = Fraction(0, 1);
+			}
+
+			MinimumAndRowIndex.clear();
+
+			// Check for negative element
+			if (matrix[matrix.RowNumber - 1][i] < -ZeroElement) {
+				for (int j = 0; j < matrix.RowNumber - 1; j++) {
+					if (matrix[j][i] > ZeroElement) {
+						ElementType TEMPDEBUG = matrix[j][matrix.ColNumber - 1] / matrix[j][i];
+						// We add any elements that are equal to current minimum
+						if (matrix[j][matrix.ColNumber - 1] / matrix[j][i] <= (ColumnMinimum + ZeroElement)) {
+							ColumnMinimum = matrix[j][matrix.ColNumber - 1] / matrix[j][i];
+							CurrentLead = matrix[j][i];
+							CurrentRowIndex = j;
+							MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
+						}
+					}
+				}
+			}
+
+			if (CurrentRowIndex != -1) {
+				// Delete all elements that are not minimum
+				// There can be more than one minimum
+				// I keep all the minimums
+				for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+					auto MR = MinimumAndRowIndex[i];
+					// Check if a value not equal to minimum
+					bool IsCurrentEqualToMinimum;// = (IS_SAME_TYPE(ElementType, float)) ? (fabs(MR.first - ColumnMinimum) > EPSILON) : (MR.first == ColumnMinimum);
+					if constexpr (IS_SAME_TYPE(ElementType, float)) {
+						IsCurrentEqualToMinimum = (fabs(MR.first - ColumnMinimum)) > EPSILON;
+					} else {
+						IsCurrentEqualToMinimum = (MR.first == ColumnMinimum);
+					}
+					
+					if (IsCurrentEqualToMinimum) {
+						MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+						i = -1;
+					}
+				}
+
+				for (std::pair<ElementType, int> MR : MinimumAndRowIndex) {
+					bool IsRowBanned = false;
+					for (auto row : step.RowsBannedToSwap) {
+						if (row == MR.second) {
+							IsRowBanned = true;
+						}
+					}
+
+					// Multiple Minimums
+					if (!IsRowBanned) {
+						int CellIndex = i + MR.second * step.RealMatrix.ColNumber;
+						if (matrix[matrix.RowNumber - 1][i] < 0) {
+							ImGui::PushID(CellIndex);
+
+							// Different formatting depending on which type is currently used
+							if constexpr (IS_SAME_TYPE(ElementType, float)) {
+								// Real case
+								ImGui::RadioButton(std::to_string(matrix[MR.second][i]).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
+							} else {
+								// Fractional case
+								if (matrix[MR.second][i].denominator != 1) {
+									// We display denominator if it doesn't equal to 1
+									ImGui::Text((std::to_string(matrix[MR.second][i].numerator) + std::string("/") + std::to_string(matrix[MR.second][i].denominator)).c_str());
+								} else {
+									// We don't display denominator if it equals to 1
+									ImGui::Text((std::to_string(matrix[MR.second][i].numerator)).c_str());
+								}
+							}
+
+							ImGui::PopID();
+							Leads.push_back(RowAndColumn({ MR.second, i }));
+						}
+					}
+				}
+			}
+		}
+
+		// Solution doesn't exist if leads are empty
+		if (!step.IsCompleted && Leads.size() == 0) {
+			ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
+			step.IsCompleted = true;
+		}
+
+		if (!step.IsCompleted) {
+			// Extract column nubmer out of cell index
+			Column = CurrentCellIndex % matrix.ColNumber;
+			// Extract row number out of cell index
+			int Row = CurrentCellIndex / matrix.ColNumber;
+
+			// Resets column to first available element each new step
+			if (PreviousStepID != step.StepID) {
+				Column = Leads[0].Column;
+				Row = Leads[0].Row;
+				PreviousStepID = step.StepID;
+			}
+
+			// Assign chosen row and column
+			CurrentLeadPos.Column = Column;
+			CurrentLeadPos.Row = Row;
+
+			if (ImGui::Button("Confirm")) {
+				assert(Column != -1);
+				step.IsWaitingForInput = false;
+				step.LeadElementRC.Column = Column;
+				step.LeadElementRC.Row = Row;
+				assert(step.LeadElementRC.Row != -1);
+				assert(step.LeadElementRC.Column != -1);
+			}
+		}
+
+		ImGui::PopID();
+	}
+
+	if (!step.IsWaitingForInput) {
+		int RowNumber = matrix.RowNumber;
+		for (int iteration = 0; iteration < RowNumber; iteration++) {
+			// Calculate current step
+			Step NewStep = SimplexStep(step, false);
+
+			if (NewStep.IsCompleted) {
+				break;
+			}
+
+			// Change order of variables in the array of variables
+			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(RowNumber - 1) + NewStep.StepChosenRC.Column]);
+			NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (RowNumber - 1) + NewStep.StepChosenRC.Column);
+			if constexpr (IS_SAME_TYPE(ElementType, float)) {
+				NewStep.RealMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
+			} else {
+				NewStep.FracMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
+			}
+
+			// Disables "confirm" button
+			if constexpr (IS_SAME_TYPE(ElementType, float)) {
+				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
+				if (state == COMPLETED) {
+					NewStep.IsCompleted = true;
+				}
+			} else {
+				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
+				if (state == COMPLETED) {
+					NewStep.IsCompleted = true;
+				}
+			}
+
+			if (!NewStep.IsAutomatic) {
+				NewStep.IsWaitingForInput = true;
+				ArtificialBasisSteps.push_back(NewStep);
+				break;
+			}
+			ArtificialBasisSteps.push_back(NewStep);
+			step = NewStep;
+		}
+	}
+}
+
 template<typename MatrixType> void DisplayStepOnScreen(MatrixType &matrix, int StepID, std::vector<int> NumbersOfVariables) {
 	ImDrawList* DrawList = ImGui::GetWindowDrawList();
 
@@ -1307,7 +1523,12 @@ int main() {
 
 					// Display all steps that has been calculated
 					DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
-					ArtificialBasis(step, IsFractionalCoefficients);
+					//ArtificialBasis(step, IsFractionalCoefficients);
+					if (IsFractionalCoefficients) {
+						ArtificialBasis<Matrix, float>(step);
+					} else {
+						ArtificialBasis<FractionalMatrix, Fraction>(step);
+					}
 				} else {
 					// Explicit Basis Steps
 					// TODO: Make explicit basis steps for rational coefficients

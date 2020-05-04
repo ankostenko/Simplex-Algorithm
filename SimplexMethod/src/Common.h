@@ -3,6 +3,8 @@
 #undef EPSILON
 #define EPSILON 0.00001f
 
+#define IS_SAME_TYPE(Type1, Type2) (std::is_same<Type1, Type2>::value)
+
 // Basic math functions
 // --------------------
 int gcd(int a, int b) {
@@ -51,6 +53,26 @@ struct Fraction {
 		return result;
 	}
 
+	bool operator>(Fraction other) const {
+		int TempNumerator = numerator;
+		int TempDenominator = denominator;
+
+		if (denominator != other.denominator) {
+			TempNumerator *= other.denominator;
+			int TempOtherNumerator = other.numerator * denominator;
+			// Overflow handling
+			if (other.numerator > INT32_MAX / denominator) {
+				float ApproxValue = (float)numerator / denominator;
+				float ApproxOtherValue = (float)other.numerator / other.denominator;
+
+				return ApproxValue > ApproxOtherValue;
+			}
+			other.numerator *= denominator;
+		}
+
+		return (TempNumerator > other.numerator);
+	}
+
 	bool operator>(int value) {
 		value *= denominator;
 		return numerator > value;
@@ -64,7 +86,7 @@ struct Fraction {
 	bool operator<=(Fraction other) {
 		long long LLNumerator = numerator;
 		long long LLOtherNumerator = other.numerator;
-		
+
 		if (denominator != other.denominator) {
 			LLNumerator *= other.denominator;
 			LLOtherNumerator *= denominator;
@@ -78,7 +100,7 @@ struct Fraction {
 		if (numerator == 0 && other.numerator == 0) {
 			return true;
 		}
-		
+
 		int CurGCD = gcd(other.numerator, other.denominator);
 		other.numerator /= CurGCD;
 		other.denominator /= CurGCD;
@@ -177,7 +199,7 @@ struct Fraction {
 		return Fraction(-numerator, denominator);
 	}
 
-	Fraction &operator+=(const Fraction &other){
+	Fraction& operator+=(const Fraction& other) {
 		int OtherNumerator = other.numerator;
 		if (denominator != other.denominator) {
 			int temp = denominator;
@@ -192,12 +214,11 @@ struct Fraction {
 		return *(this);
 	}
 
-	Fraction &operator=(const Fraction& other) {
+	Fraction& operator=(const Fraction& other) {
 		numerator = other.numerator;
 		denominator = other.denominator;
 		return *this;
 	}
-
 };
 
 struct FractionalMatrix {
