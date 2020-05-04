@@ -413,6 +413,7 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
 		static int Column = 0;
+		static int CurrentCellIndex = 0;
 
 		// Pair of id and column number
 		std::vector<RowAndColumn> Leads;
@@ -478,14 +479,15 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 				MinimumAndRowIndex.clear();
 				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
 					for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
-							if (step.RealMatrix[j][i] > 0) {
-								if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] <= ColumnMinimum + EPSILON) {
-									ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
-									CurrentLead = step.RealMatrix[j][i];
-									CurrentRowIndex = j;
-									MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
-								}
+						if (step.RealMatrix[j][i] > 0) {
+							float TEMPDEBUG = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
+							if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] <= ColumnMinimum + EPSILON) {
+								ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
+								CurrentLead = step.RealMatrix[j][i];
+								CurrentRowIndex = j;
+								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
 							}
+						}
 					}
 				}
 
@@ -510,48 +512,49 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 							}
 						}
 
+						// Multiple Minimums
 						if (!IsRowBanned) {
+							int CellIndex = i + MR.second * step.RealMatrix.ColNumber;
 							if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-								ImGui::PushID(i);
-								ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
+								ImGui::PushID(CellIndex);
+								ImGui::RadioButton(std::to_string(step.RealMatrix[MR.second][i]).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
 								ImGui::PopID();
-								Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+								Leads.push_back(RowAndColumn({ MR.second, i }));
 							}
 						}
 					}
 				}
 			}
 		}
+
 		// Solution doesn't exist if leads are empty
-		if (Leads.size() == 0) {
+		if (!step.IsCompleted && Leads.size() == 0) {
 			ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
 			step.IsCompleted = true;
 		}
 
 		if (!step.IsCompleted) {
+			// Extract column nubmer out of cell index
+			Column = CurrentCellIndex % step.RealMatrix.ColNumber;
+			// Extract row number out of cell index
+			int Row = CurrentCellIndex / step.RealMatrix.ColNumber;
+
 			// Resets column to first available element each new step
 			if (PreviousStepID != step.StepID) {
 				Column = Leads[0].Column;
+				Row = Leads[0].Row;
 				PreviousStepID = step.StepID;
 			}
 
 			// Assign chosen row and column
 			CurrentLeadPos.Column = Column;
-			for (auto rc : Leads) {
-				if (rc.Column == Column) {
-					CurrentLeadPos.Row = rc.Row;
-				}
-			}
+			CurrentLeadPos.Row = Row;
 
 			if (ImGui::Button("Confirm")) {
 				assert(Column != -1);
 				step.IsWaitingForInput = false;
 				step.LeadElementRC.Column = Column;
-				for (RowAndColumn rc : Leads) {
-					if (rc.Column == Column) {
-						step.LeadElementRC.Row = rc.Row;
-					}
-				}
+				step.LeadElementRC.Row = Row;
 				assert(step.LeadElementRC.Row    != -1);
 				assert(step.LeadElementRC.Column != -1);
 			}
@@ -587,11 +590,13 @@ void ArtificialBasis(Step step, bool IsFractionalCoefficients) {
 
 			// Disables "confirm" button
 			if (IsFractionalCoefficients) {
-				if (NewStep.FracMatrix[NewStep.FracMatrix.RowNumber - 1][NewStep.FracMatrix.ColNumber - 1] == Fraction(0, 1)) {
+				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
+				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
 			} else {
-				if (fabs(NewStep.RealMatrix[NewStep.RealMatrix.RowNumber - 1][NewStep.RealMatrix.ColNumber - 1]) < EPSILON) {
+				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
+				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
 			}
@@ -743,6 +748,7 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 		ImGui::PushID("Choose Lead Element");
 		int CurrentRowIndex = -1;
 		static int Column = 0;
+		static int CurrentCellIndex = 0;
 
 		// Pair of id and column number
 		// TODO: Add multiple minimums support
@@ -820,42 +826,43 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 							i = -1;
 						}
 					}
-					
-					if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-						ImGui::PushID(i);
-						ImGui::RadioButton(std::to_string(step.RealMatrix[CurrentRowIndex][i]).c_str(), &Column, i); ImGui::SameLine();
-						ImGui::PopID();
-						// Push possible leading element
-						Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+
+					for (std::pair<float, int> MR : MinimumAndRowIndex) {
+						// Multiple Minimums
+						int CellIndex = i + MR.second * step.RealMatrix.ColNumber;
+						if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
+							ImGui::PushID(CellIndex);
+							ImGui::RadioButton(std::to_string(step.RealMatrix[MR.second][i]).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
+							ImGui::PopID();
+							Leads.push_back(RowAndColumn({ MR.second, i }));
+						}
 					}
 				}
 			}
 		}
 
 		if (!step.IsCompleted) {
+			// Extract column nubmer out of cell index
+			Column = CurrentCellIndex % step.RealMatrix.ColNumber;
+			// Extract row number out of cell index
+			int Row = CurrentCellIndex / step.RealMatrix.ColNumber;
+
 			// Resets column to first available element each new step
 			if (PreviousStepID != step.StepID || step.StepID == 0) {
 				Column = Leads[0].Column;
+				Row = Leads[0].Row;
 				PreviousStepID = step.StepID;
 			}
-
+				
 			// Assign chosen row and column
 			CurrentLeadPos.Column = Column;
-			for (auto rc : Leads) {
-				if (rc.Column == Column) {
-					CurrentLeadPos.Row = rc.Row;
-				}
-			}
+			CurrentLeadPos.Row = Row;
 
 			if (ImGui::Button("Confirm")) {
 				assert(Column != -1);
 				step.IsWaitingForInput = false;
 				step.LeadElementRC.Column = Column;
-				for (RowAndColumn rc : Leads) {
-					if (rc.Column == Column) {
-						step.LeadElementRC.Row = rc.Row;
-					}
-				}
+				step.LeadElementRC.Row = Row;
 				assert(step.LeadElementRC.Row != -1);
 				assert(step.LeadElementRC.Column != -1);
 			}
@@ -891,11 +898,14 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 
 			// Disables "confirm" button
 			if (IsFractionalCoefficients) {
-				if (NewStep.FracMatrix[RowNumber - 1][ColNumber - 1] == Fraction(0, 1)) {
+				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
+				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
+
 			} else {
-				if (fabs(NewStep.RealMatrix[RowNumber - 1][ColNumber - 1]) < EPSILON) {
+				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
+				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
 			}
