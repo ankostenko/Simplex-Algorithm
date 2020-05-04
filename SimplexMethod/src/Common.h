@@ -3,11 +3,21 @@
 #undef EPSILON
 #define EPSILON 0.00001f
 
+// Basic math functions
+// --------------------
 int gcd(int a, int b) {
 	if (b == 0)
 		return a;
 	return gcd(b, a % b);
 }
+
+static int Clamp(int value, int min, int max) {
+	if (value > max) return max;
+	if (value < min) return min;
+
+	return value;
+}
+//--------------------
 
 struct Fraction {
 	int numerator;
@@ -279,7 +289,8 @@ struct FractionalMatrix {
 	}
 };
 
-struct Matrix {
+class Matrix {
+public:
 	float* matrix = NULL;
 	int RowNumber;
 	int ColNumber;
