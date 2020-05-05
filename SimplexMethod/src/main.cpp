@@ -461,6 +461,13 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 		}
 
 		if (!step.IsCompleted) {		
+			// Choose first available leading element
+			if (PreviousStepID != step.StepID) {
+				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
+				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
+				PreviousStepID = step.StepID;
+			}
+
 			if (ImGui::Button(u8"Подтвердить")) {
 				assert(Column != -1);
 				step.IsWaitingForInput = false;

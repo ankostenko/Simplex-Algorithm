@@ -232,22 +232,19 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 			bool IsThisCellShouldBeButton = false;
 			if (state == CONTINUE) {
 				float width = ImGui::GetColumnWidth();
-				float height = ImGui::GetTextLineHeight();
-
-				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
 				
 				for (RowAndColumn ElementRC : PotentialLeads) {
 					if (ElementRC.Row == i && ElementRC.Column == j && IsLastIteration) {
 						ImGui::PushID(i + j * matrix.ColNumber);
 						if ((ElementRC.Row == CurrentLeadPos.Row && ElementRC.Column == CurrentLeadPos.Column)) {
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-							if (ImGui::Button(CellLabel.c_str())) {
+							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.59f, 0.98f, 1.0f));
+							if (ImGui::Button(CellLabel.c_str(), ImVec2(width - 15.0f, ImGui::GetTextLineHeight() * 1.3f))) {
 								CurrentLeadPos = ElementRC;
 							}
 							ImGui::PopStyleColor();
 						} else {
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
-							if (ImGui::Button(CellLabel.c_str())) {
+							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.59f, 0.98f, 0.40f));
+							if (ImGui::Button(CellLabel.c_str(), ImVec2(width - 15.0f, ImGui::GetTextLineHeight() * 1.3f))) {
 								CurrentLeadPos = ElementRC;
 							}
 							ImGui::PopStyleColor();
