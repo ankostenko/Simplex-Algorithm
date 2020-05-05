@@ -665,8 +665,8 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 				CurrentLead = FLT_MAX;
 				ColumnMinimum = FLT_MAX;
 			} else {
-				CurrentLead = Fraction(0, 1);
-				ColumnMinimum = Fraction(0, 1);
+				CurrentLead = Fraction(INT32_MAX, 1);
+				ColumnMinimum = Fraction(INT32_MAX, 1);
 			}
 
 			MinimumAndRowIndex.clear();
@@ -694,14 +694,14 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 				for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
 					auto MR = MinimumAndRowIndex[i];
 					// Check if a value not equal to minimum
-					bool IsCurrentEqualToMinimum;// = (IS_SAME_TYPE(ElementType, float)) ? (fabs(MR.first - ColumnMinimum) > EPSILON) : (MR.first == ColumnMinimum);
+					bool IsCurrentNotEqualToMinimum;// = (IS_SAME_TYPE(ElementType, float)) ? (fabs(MR.first - ColumnMinimum) > EPSILON) : (MR.first == ColumnMinimum);
 					if constexpr (IS_SAME_TYPE(ElementType, float)) {
-						IsCurrentEqualToMinimum = (fabs(MR.first - ColumnMinimum)) > EPSILON;
+						IsCurrentNotEqualToMinimum = (fabs(MR.first - ColumnMinimum)) > EPSILON;
 					} else {
-						IsCurrentEqualToMinimum = (MR.first == ColumnMinimum);
+						IsCurrentNotEqualToMinimum = (MR.first != ColumnMinimum);
 					}
 					
-					if (IsCurrentEqualToMinimum) {
+					if (IsCurrentNotEqualToMinimum) {
 						MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
 						i = -1;
 					}
@@ -729,10 +729,11 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 								// Fractional case
 								if (matrix[MR.second][i].denominator != 1) {
 									// We display denominator if it doesn't equal to 1
-									ImGui::Text((std::to_string(matrix[MR.second][i].numerator) + std::string("/") + std::to_string(matrix[MR.second][i].denominator)).c_str());
+									ImGui::RadioButton((std::to_string(matrix[MR.second][i].numerator) + std::string("/") + std::to_string(matrix[MR.second][i].denominator)).c_str(),
+										&CurrentCellIndex, CellIndex); ImGui::SameLine();
 								} else {
 									// We don't display denominator if it equals to 1
-									ImGui::Text((std::to_string(matrix[MR.second][i].numerator)).c_str());
+									ImGui::RadioButton((std::to_string(matrix[MR.second][i].numerator)).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
 								}
 							}
 
@@ -1524,7 +1525,7 @@ int main() {
 					// Display all steps that has been calculated
 					DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
 					//ArtificialBasis(step, IsFractionalCoefficients);
-					if (IsFractionalCoefficients) {
+					if (!IsFractionalCoefficients) {
 						ArtificialBasis<Matrix, float>(step);
 					} else {
 						ArtificialBasis<FractionalMatrix, Fraction>(step);
