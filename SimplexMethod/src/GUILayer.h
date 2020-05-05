@@ -179,7 +179,8 @@ template<typename MatrixType> void DisplaySolutionVector(MatrixType &matrix, std
 }
 
 RowAndColumn CurrentLeadPos;
-template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int StepID, std::vector<int> NumbersOfVariables) {
+std::vector<RowAndColumn> PotentialLeads;
+template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int StepID, bool IsLastIteration, std::vector<int> NumbersOfVariables) {
 	ImDrawList* DrawList = ImGui::GetWindowDrawList();
 
 	ImGui::NewLine();
@@ -210,29 +211,57 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 
 			// Checking algorithm state
 			AlgorithmState state = CheckAlgorithmState(matrix, false, false);
-
-			// Fill with a color chosen cell
-			if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column)/* && (StepID == ArtificialBasisSteps.size() - 2)*/) {
-				float width = ImGui::GetColumnWidth();
-				float height = ImGui::GetTextLineHeight();
-
-				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
-				DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
-			}
-
-			// Output differences
+			
+			std::string CellLabel;
+			// Labels
 			if constexpr (std::is_same<MatrixType, Matrix>::value) {
 				// Real case
-				ImGui::Text(std::to_string(matrix[i][j]).c_str());
+				CellLabel = std::to_string(matrix[i][j]);
 			} else {
 				// Fractional case
 				if (matrix[i][j].denominator != 1) {
 					// We display denominator if it doesn't equal to 1
-					ImGui::Text((std::to_string(matrix[i][j].numerator) + std::string("/") + std::to_string(matrix[i][j].denominator)).c_str());
+					CellLabel = (std::to_string(matrix[i][j].numerator) + std::string("/") + std::to_string(matrix[i][j].denominator));
 				} else {
 					// We don't display denominator if it equals to 1
-					ImGui::Text((std::to_string(matrix[i][j].numerator)).c_str());
+					CellLabel = (std::to_string(matrix[i][j].numerator));
 				}
+			}
+
+			// Fill with a color chosen cell
+			bool IsThisCellShouldBeButton = false;
+			if (state == CONTINUE) {
+				float width = ImGui::GetColumnWidth();
+				float height = ImGui::GetTextLineHeight();
+
+				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
+				
+				for (RowAndColumn ElementRC : PotentialLeads) {
+					if (ElementRC.Row == i && ElementRC.Column == j && IsLastIteration) {
+						ImGui::PushID(i + j * matrix.ColNumber);
+						if ((ElementRC.Row == CurrentLeadPos.Row && ElementRC.Column == CurrentLeadPos.Column)) {
+							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+							if (ImGui::Button(CellLabel.c_str())) {
+								CurrentLeadPos = ElementRC;
+							}
+							ImGui::PopStyleColor();
+						} else {
+							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+							if (ImGui::Button(CellLabel.c_str())) {
+								CurrentLeadPos = ElementRC;
+							}
+							ImGui::PopStyleColor();
+						}
+						ImGui::PopID();
+
+						IsThisCellShouldBeButton = true;
+					}
+				}
+			}
+
+			// We already have text for this cell
+			if (!IsThisCellShouldBeButton) {
+				ImGui::Text(CellLabel.c_str());
 			}
 
 			ImGui::NextColumn();
@@ -248,10 +277,11 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoefficients) {
 	if (Steps.size() != 0) {
 		for (int i = StartIndex; i < Steps.size(); i++) {
+			bool IsLastIteration = (i == Steps.size() - 1);
 			if (IsFractionalCoefficients) {
-				DisplayStepOnScreen(Steps[i].FracMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
+				DisplayStepOnScreen(Steps[i].FracMatrix, Steps[i].StepID, IsLastIteration, Steps[i].NumbersOfVariables);
 			} else {
-				DisplayStepOnScreen(Steps[i].RealMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
+				DisplayStepOnScreen(Steps[i].RealMatrix, Steps[i].StepID, IsLastIteration, Steps[i].NumbersOfVariables);
 			}
 			ImGui::Separator();
 		}

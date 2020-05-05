@@ -342,6 +342,9 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 }
 
 template<typename MatrixType, typename ElementType> void ArtificialBasis(Step step) {
+	// Clear all leads each new iteration
+	GUILayer::PotentialLeads.clear();
+	
 	// Depending on type of matrix choose one of those to use
 	MatrixType matrix;
 	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
@@ -451,62 +454,18 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 
 					// Multiple Minimums
 					if (!IsRowBanned) {
-						int CellIndex = i + MR.second * matrix.ColNumber;
-						if (matrix[matrix.RowNumber - 1][i] < 0) {
-							ImGui::PushID(CellIndex);
-
-							// Different formatting depending on which type is currently used
-							if constexpr (IS_SAME_TYPE(ElementType, float)) {
-								// Real case
-								ImGui::RadioButton(std::to_string(matrix[MR.second][i]).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
-							} else {
-								// Fractional case
-								if (matrix[MR.second][i].denominator != 1) {
-									// We display denominator if it doesn't equal to 1
-									ImGui::RadioButton((std::to_string(matrix[MR.second][i].numerator) + std::string("/") + std::to_string(matrix[MR.second][i].denominator)).c_str(),
-										&CurrentCellIndex, CellIndex); ImGui::SameLine();
-								} else {
-									// We don't display denominator if it equals to 1
-									ImGui::RadioButton((std::to_string(matrix[MR.second][i].numerator)).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
-								}
-							}
-
-							ImGui::PopID();
-							Leads.push_back(RowAndColumn({ MR.second, i }));
-						}
+						GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
 					}
 				}
 			}
 		}
 
-		// Solution doesn't exist if leads are empty
-		if (!step.IsCompleted && Leads.size() == 0) {
-			ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
-			step.IsCompleted = true;
-		}
-
-		if (!step.IsCompleted) {
-			// Extract column nubmer out of cell index
-			Column = CurrentCellIndex % matrix.ColNumber;
-			// Extract row number out of cell index
-			int Row = CurrentCellIndex / matrix.ColNumber;
-
-			// Resets column to first available element each new step
-			if (PreviousStepID != step.StepID) {
-				Column = Leads[0].Column;
-				Row = Leads[0].Row;
-				PreviousStepID = step.StepID;
-			}
-
-			// Assign chosen row and column
-			GUILayer::CurrentLeadPos.Column = Column;
-			GUILayer::CurrentLeadPos.Row = Row;
-
-			if (ImGui::Button("Confirm")) {
+		if (!step.IsCompleted) {		
+			if (ImGui::Button(u8"Подтвердить")) {
 				assert(Column != -1);
 				step.IsWaitingForInput = false;
-				step.LeadElementRC.Column = Column;
-				step.LeadElementRC.Row = Row;
+				step.LeadElementRC.Column = GUILayer::CurrentLeadPos.Column;
+				step.LeadElementRC.Row = GUILayer::CurrentLeadPos.Row;
 				assert(step.LeadElementRC.Row != -1);
 				assert(step.LeadElementRC.Column != -1);
 			}
@@ -857,6 +816,10 @@ Step ExplicitBasis(Step step, std::vector<float>& RealExplicitBasis, std::vector
 	step.NumbersOfVariables = VariablesPositions;
 	MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
 	return step;
+}
+
+void func(const char *text) {
+
 }
 
 int main() {
