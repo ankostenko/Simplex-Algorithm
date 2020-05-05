@@ -24,6 +24,7 @@
 #include <vector>
 #include <string>
 #include <type_traits>
+#include <algorithm>
 
 #include "Common.h"
 #include "GUILayer.h"
@@ -193,7 +194,7 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 	} else {
 		CurrentColumnIndex = step.LeadElementRC.Column;
 		CurrentRowIndex = step.LeadElementRC.Row;
-		
+
 		// Assignment of lead element
 		CurrentLead = matrix[step.LeadElementRC.Row][step.LeadElementRC.Column];
 	}
@@ -340,8 +341,6 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 	step.FracMatrix[step.FracMatrix.RowNumber - 1][step.FracMatrix.ColNumber - 1] = -ColumnSum;
 }
 
-RowAndColumn CurrentLeadPos;
-
 template<typename MatrixType, typename ElementType> void ArtificialBasis(Step step) {
 	// Depending on type of matrix choose one of those to use
 	MatrixType matrix;
@@ -350,7 +349,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 	} else {
 		matrix = step.FracMatrix;
 	}
-	
+
 	// Type-independent zero element
 	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
 	ElementType ZeroElement;
@@ -435,7 +434,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 					} else {
 						IsCurrentNotEqualToMinimum = (MR.first != ColumnMinimum);
 					}
-					
+
 					if (IsCurrentNotEqualToMinimum) {
 						MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
 						i = -1;
@@ -500,8 +499,8 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 			}
 
 			// Assign chosen row and column
-			CurrentLeadPos.Column = Column;
-			CurrentLeadPos.Row = Row;
+			GUILayer::CurrentLeadPos.Column = Column;
+			GUILayer::CurrentLeadPos.Row = Row;
 
 			if (ImGui::Button("Confirm")) {
 				assert(Column != -1);
@@ -561,91 +560,6 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 	}
 }
 
-template<typename MatrixType> void DisplayStepOnScreen(MatrixType &matrix, int StepID, std::vector<int> NumbersOfVariables) {
-	ImDrawList* DrawList = ImGui::GetWindowDrawList();
-
-	ImGui::NewLine();
-	ImGui::Separator();
-	ImGui::NewLine();
-
-	ImGui::Columns(matrix.ColNumber + 1);
-
-	ImGui::Text((std::string("#") + std::to_string(StepID)).c_str());
-	ImGui::NextColumn();
-
-	for (int i = 0; i < matrix.ColNumber - 1; i++) {
-		ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[(matrix.RowNumber - 1) + i])).c_str());
-		ImGui::NextColumn();
-	}
-	ImGui::NextColumn();
-	ImGui::Separator();
-	for (int i = 0; i < matrix.RowNumber; i++) {
-		// Do not display variable name for the last row
-		if (i < matrix.RowNumber - 1) {
-			ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[i])).c_str());
-			ImGui::NextColumn();
-		}
-		for (int j = 0; j < matrix.ColNumber; j++) {
-			if (j == 0 && i == matrix.RowNumber - 1) {
-				ImGui::NextColumn();
-			}
-
-			// Checking algorithm state
-			AlgorithmState state = CheckAlgorithmState(matrix, false, false);
-
-			// Fill with a color chosen cell
-			if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column) && (StepID == ArtificialBasisSteps.size() - 2)) {
-				float width = ImGui::GetColumnWidth();
-				float height = ImGui::GetTextLineHeight();
-
-				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
-				DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
-			}
-
-			// Output differences
-			if constexpr (std::is_same<MatrixType, Matrix>::value) {
-				// Real case
-				ImGui::Text(std::to_string(matrix[i][j]).c_str());
-			} else {
-				// Fractional case
-				if (matrix[i][j].denominator != 1) {
-					// We display denominator if it doesn't equal to 1
-					ImGui::Text((std::to_string(matrix[i][j].numerator) + std::string("/") + std::to_string(matrix[i][j].denominator)).c_str());
-				} else {
-					// We don't display denominator if it equals to 1
-					ImGui::Text((std::to_string(matrix[i][j].numerator)).c_str());
-				}
-			}
-
-			ImGui::NextColumn();
-		}
-		if (i != matrix.RowNumber - 1) {
-			ImGui::Separator();
-		}
-	}
-
-	ImGui::Columns(1);
-}
-
-void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoefficients) {
-	if (Steps.size() != 0) {
-		if (ImGui::BeginTabBar((std::to_string(StartIndex) + std::string("Simplex Algorithm Solutions")).c_str())) {
-			if (ImGui::BeginTabItem("Simplex Algorithm")) {
-				for (int i = StartIndex; i < Steps.size(); i++) {
-					if (IsFractionalCoefficients) {
-						DisplayStepOnScreen(Steps[i].FracMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
-					} else {
-						DisplayStepOnScreen(Steps[i].RealMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
-					}
-					ImGui::Separator();
-				}
-				ImGui::EndTabItem();
-			}
-			ImGui::EndTabBar();
-		}
-	}
-}
-
 void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 	static int PreviousStepID = step.StepID;
 
@@ -662,10 +576,8 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 	assert(state != UNDEFINED);
 
 	if (state == UNLIMITED_SOLUTION) {
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution is unlimited!");
 		step.IsCompleted = true;
 	} else if (state == COMPLETED) {
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Algorithm has completed!");
 		step.IsCompleted = true;
 	}
 
@@ -781,8 +693,8 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 			}
 
 			// Assign chosen row and column
-			CurrentLeadPos.Column = Column;
-			CurrentLeadPos.Row = Row;
+			GUILayer::CurrentLeadPos.Column = Column;
+			GUILayer::CurrentLeadPos.Row = Row;
 
 			if (ImGui::Button("Confirm")) {
 				assert(Column != -1);
@@ -811,8 +723,6 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 
 
 		for (int iteration = 0; iteration < RowNumber; iteration++) {
-			PrintMatrix(step.RealMatrix);
-
 			Step NewStep;
 			if (!IsFractionalCoefficients) {
 				NewStep = SimplexStep<Matrix, float>(step);
@@ -957,6 +867,7 @@ int main() {
 	int SizeConfirmedClicked = 0;
 	int OldSizeCondfirmedClicked = 0;
 	int IsArtificialBasis = true;
+	int IsFractionalCoefficients = 0;
 	bool ShowSolution = false;
 	bool StartSimplexAlgorithm = false;
 	bool SizeConfirmedReadyToContinue = false;
@@ -1028,7 +939,7 @@ int main() {
 			window_flags |= ImGuiWindowFlags_NoBackground;
 		}
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-		ImGui::Begin("DockSpace Demo", 0, window_flags);
+		ImGui::Begin("DockSpace", 0, window_flags);
 		ImGui::PopStyleVar();
 
 		if (opt_fullscreen) {
@@ -1044,7 +955,7 @@ int main() {
 		// -------------------------------------------
 
 		// Configuration Window
-		ImGui::Begin(u8"Конфигурация задачи", NULL, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove);
+		ImGui::Begin(u8"Конфигурация задачи", NULL, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
 
 		// Size title
 		ImGui::Text(u8"Выберите размерность задачи");
@@ -1072,7 +983,6 @@ int main() {
 		ImGui::Separator();
 
 		// Size is confirmed we can proceed further
-		static int IsFractionalCoefficients = 0;
 		if (SizeConfirmedReadyToContinue) {
 			// Choose between real number and fractions
 			ImGui::Text(u8"Выбор типа элементов");
@@ -1104,17 +1014,17 @@ int main() {
 		ImGui::End();
 
 		// Data input window
-		ImGui::Begin(u8"Ввод данных", 0, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+		ImGui::Begin(u8"Ввод данных", 0, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
 		if (ContinueToProblemInput) {
 			// Input of explicit basis
 			if (!IsArtificialBasis) {
 				ImGui::Text(u8"Введите базис");
-			
+
 				ImGui::PushID("Explicit Basis");
 				if (!IsFractionalCoefficients) {
 					ImGui::PushID("Real Basis");
 					// Real basis input
-					GUILayer::InputVector(RealExplicitBasis, RealExplicitBasis.size(), 
+					GUILayer::InputVector(RealExplicitBasis, RealExplicitBasis.size(),
 						// Print Function
 						[](int Size) {
 							for (int i = 0; i < Size; i++) {
@@ -1145,9 +1055,10 @@ int main() {
 			// Matrix of limitations
 			ImGui::PushID("Matrix");
 			ImGui::Text(u8"Матрица ограничений");
+			// Group
 			ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 140, 0.0f));
 			ImGui::BeginChild("Matrix Of Limitations", ImVec2(0, ImGui::GetFontSize() * RealMatrix.RowNumber * 2), false, ImGuiWindowFlags_HorizontalScrollbar);
-			
+
 			if (!IsFractionalCoefficients) {
 				GUILayer::MatrixInput(RealMatrix);
 			} else {
@@ -1164,9 +1075,9 @@ int main() {
 			if (!IsFractionalCoefficients) {
 				ImGui::PushID("Real Function");
 				// Target function input with lambda expression
-				GUILayer::InputVector(RealTargetFunction, RealTargetFunction.size(), 
+				GUILayer::InputVector(RealTargetFunction, RealTargetFunction.size(),
 					// Print Function
-					[](int Size) { 
+					[](int Size) {
 						for (int i = 0; i < Size - 1; i++) {
 							ImGui::Text((std::string("x") + std::to_string(i + 1)).c_str());
 							ImGui::NextColumn();
@@ -1177,7 +1088,7 @@ int main() {
 				ImGui::PopID();
 			} else {
 				ImGui::PushID("Fractional Function");
-				
+
 				// Target function input with lambda expression
 				GUILayer::InputVector(FractionalTargetFunction, FractionalTargetFunction.size(),
 					// Print Function
@@ -1193,16 +1104,12 @@ int main() {
 				ImGui::PopID();
 			}
 
-			// ====================================
-			//		VERIFIED UNTIL THAT POINT
-			// ====================================
-
 			ImGui::Spacing();
 
 			if (ImGui::Button(u8"Решить")) {
 				ShowSolution = true;
 			}
-			
+
 			if (ShowSolution) {
 				ImGui::SameLine();
 				if (ImGui::Button(u8"Отменить решение")) {
@@ -1214,13 +1121,29 @@ int main() {
 					StartSimplexAlgorithm = false;
 				}
 			}
+		}
+		ImGui::End();
+		// ====================================
+		//		VERIFIED UNTIL THAT POINT
+		// ====================================
 
-			ImGui::Separator();
-			ImGui::Text("Solution");
+		if (ShowSolution) {
+			ImGui::Begin(u8"Решение", &ShowSolution, ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
-			if (ShowSolution) {
-				// Artificial Basis Step
-				if (IsArtificialBasis) {
+			// If solution window was closed we need to restore state to non-solved
+			if (ShowSolution == false) {
+				Step FirstStep = ArtificialBasisSteps[0];
+				ArtificialBasisSteps.clear();
+				ArtificialBasisSteps.push_back(FirstStep);
+				SimplexAlgorithmSteps.clear();
+				StartSimplexAlgorithm = false;
+			}
+
+			ImGui::BeginTabBar("Solutions");
+
+			// Artificial Basis Step
+			if (IsArtificialBasis) {
+				if (ImGui::BeginTabItem(u8"Искусственный базис")) {
 					// Calculate next step of simplex algorithm
 					size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
 					step = ArtificialBasisSteps[LastElementIndex];
@@ -1258,6 +1181,7 @@ int main() {
 						ArtificialBasisSteps.push_back(step);
 					}
 
+
 					if (!step.IsAutomatic) {
 						step.IsWaitingForInput = true;
 					} else {
@@ -1265,58 +1189,84 @@ int main() {
 					}
 
 					// Display all steps that has been calculated
-					DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
+//					ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
+//					ImGui::BeginChild("Matrix Of Limitations", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoResize);
+					GUILayer::DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
 					//ArtificialBasis(step, IsFractionalCoefficients);
 					if (!IsFractionalCoefficients) {
 						ArtificialBasis<Matrix, float>(step);
 					} else {
 						ArtificialBasis<FractionalMatrix, Fraction>(step);
 					}
+//					ImGui::EndChild();
+					ImGui::EndTabItem();
+				}
+			} else {
+				// Explicit Basis Steps
+				// TODO: Make explicit basis steps for rational coefficients
+				if (SimplexAlgorithmSteps.size() == 0) {
+					step.StepID = 0;
+					step.RealMatrix = RealMatrix;
+					step.FracMatrix = FracMatrix;
+					step.IsAutomatic = IsAutomatic;
+					step.IsCompleted = false;
+					step.IsArtificialStep = false;
+					// TODO: Add input checks
+					// [] Check if input vector doesn't lead to degenerate matrix
+					// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
+					//		or drop this method and use artificial basis instead
+					// First check if number of non-zero elements in the explicit vector less or equal then a number of limitations
+					int AmountOfNonZeroElements = 0;
+					for (float el : RealExplicitBasis) {
+						if (fabs(el) > EPSILON) {
+							AmountOfNonZeroElements += 1;
+						}
+					}
+
+					if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
+						printf("\nNumber of non-zero elements greater then number of limitations\n");
+						assert(0);
+					}
+
+					step = ExplicitBasis(step, RealExplicitBasis, RealTargetFunction);
+					step.IsCompleted = true;
+					//ExplicitBasisSteps.push_back(step);
+					GUILayer::DisplaySteps(ExplicitBasisSteps, 0, IsFractionalCoefficients);
+				}
+
+				if (SimplexAlgorithmSteps.size() != 0) {
+					//DisplaySteps(ExplicitBasisSteps, 0);
+				}
+			}
+
+
+			// Sholution has been found
+			ImGuiTabItemFlags SimplexAlgorithmTabFlags = ImGuiTabItemFlags_None;
+			if (step.IsCompleted && step.IsArtificialStep) {
+				ImGui::BeginChild("Solution", ImVec2(0, 0), true);
+				ImGui::Text(u8"Ответ");
+				ImGui::Separator();
+				
+				// Display solution
+				if (IsFractionalCoefficients) {
+					// Fractional case
+					GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, false);
 				} else {
-					// Explicit Basis Steps
-					// TODO: Make explicit basis steps for rational coefficients
-					if (SimplexAlgorithmSteps.size() == 0) {
-						step.StepID = 0;
-						step.RealMatrix = RealMatrix;
-						step.FracMatrix = FracMatrix;
-						step.IsAutomatic = IsAutomatic;
-						step.IsCompleted = false;
-						step.IsArtificialStep = false;
-						// TODO: Add input checks
-						// [] Check if input vector doesn't lead to degenerate matrix
-						// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
-						//		or drop this method and use artificial basis instead
-						// First check if number of non-zero elements in the explicit vector less or equal then a number of limitations
-						int AmountOfNonZeroElements = 0;
-						for (float el : RealExplicitBasis) {
-							if (fabs(el) > EPSILON) {
-								AmountOfNonZeroElements += 1;
-							}
-						}
-
-						if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
-							printf("\nNumber of non-zero elements greater then number of limitations\n");
-							assert(0);
-						}
-
-						step = ExplicitBasis(step, RealExplicitBasis, RealTargetFunction);
-						step.IsCompleted = true;
-						//ExplicitBasisSteps.push_back(step);
-						DisplaySteps(ExplicitBasisSteps, 0, IsFractionalCoefficients);
-					}
-
-					if (SimplexAlgorithmSteps.size() != 0) {
-						//DisplaySteps(ExplicitBasisSteps, 0);
-					}
+					// Real case
+					GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, false);
 				}
 
-				if (step.IsCompleted) {
-					if (ImGui::Button(u8"Start Simplex Algorithm")) {
-						StartSimplexAlgorithm = true;
-					}
-				}
+				ImGui::EndChild();
 
-				if (StartSimplexAlgorithm) {
+				if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
+					StartSimplexAlgorithm = true;
+					SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
+				}
+			}
+
+			if (StartSimplexAlgorithm) {
+				ImGui::SetNextWindowFocus();
+				if (ImGui::BeginTabItem(u8"Симплекс алгоритм", &StartSimplexAlgorithm, SimplexAlgorithmTabFlags)) {
 					if (SimplexAlgorithmSteps.size() == 0) {
 						if (IsArtificialBasis) {
 							size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
@@ -1340,13 +1290,54 @@ int main() {
 						size_t LastSimplexAlgorithmElementIndex = SimplexAlgorithmSteps.size() - 1;
 						step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 					}
-					DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
+					GUILayer::DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
 					SimplexAlgorithm(step, IsFractionalCoefficients);
+
+					// Display Solution
+					if (IsFractionalCoefficients) {
+						AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, false);
+						if (state != CONTINUE) {
+							ImGui::BeginChild("Solution", ImVec2(0, 0), true);
+							ImGui::Text(u8"Ответ");
+							ImGui::Separator();
+
+							assert(state != UNDEFINED);
+							assert(state != SOLUTION_DOESNT_EXIST);
+
+							if (state == UNLIMITED_SOLUTION) {
+								ImGui::TextColored(ImColor(255, 0, 0), u8"Решение неограничено!");
+							} else if (state == COMPLETED) {
+								// Fractional case
+								GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, true);
+							}
+							ImGui::EndChild();
+						}
+					} else {
+						AlgorithmState state = CheckAlgorithmState(step.RealMatrix, false, false);
+						if (state != CONTINUE) {
+							ImGui::BeginChild("Solution", ImVec2(0, 0), true);
+							ImGui::Text(u8"Ответ");
+							ImGui::Separator();
+
+							assert(state != UNDEFINED);
+							assert(state != SOLUTION_DOESNT_EXIST);
+
+							if (state == UNLIMITED_SOLUTION) {
+								ImGui::TextColored(ImColor(255, 0, 0), u8"Решение неограничено!");
+							} else if (state == COMPLETED) {
+								// Real case
+								GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, true);
+							}
+							ImGui::EndChild();
+						}
+					}
+					ImGui::EndTabItem();
 				}
 			}
-		}
 
-		ImGui::End();
+			ImGui::EndTabBar();
+			ImGui::End();
+		}
 
 		ImGui::Render();
 		int display_w, display_h;

@@ -121,4 +121,141 @@ template<typename MatrixType>void MatrixInput(MatrixType& matrix) {
 	ImGui::Columns(1);
 }
 
+template<typename MatrixType> void DisplaySolutionVector(MatrixType &matrix, std::vector<int> &NumbersOfVariables, bool IsCompleteSolution) {
+	ImGui::Columns(NumbersOfVariables.size());
+	for (int i = 0; i < NumbersOfVariables.size(); i++) {
+		ImGui::Text((std::string("x") + std::to_string(i + 1)).c_str());
+		ImGui::NextColumn();
+	}
+	ImGui::Separator();
+
+	// Numbers of base variables
+	std::vector<int> BaseVariablesNumbers(NumbersOfVariables.begin(), NumbersOfVariables.begin() + matrix.RowNumber - 1);
+
+	for (int i = 0, RowIndex = 0; i < NumbersOfVariables.size(); i++) {
+		int LastColumnIndex = matrix.ColNumber - 1;
+		if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+			// Real case
+			// If number of variable is base variable
+			if (DoesContain(BaseVariablesNumbers, i + 1)) {
+				ImGui::Text(std::to_string(matrix[RowIndex][LastColumnIndex]).c_str());
+				RowIndex++;
+			} else {
+				ImGui::Text("%f", 0.0f);
+			}
+		} else {
+			// Fractional case
+			if (DoesContain(BaseVariablesNumbers, i + 1)) {
+				if (matrix[RowIndex][LastColumnIndex].denominator != 1) {
+					// We display denominator if it doesn't equal to 1
+					ImGui::Text((std::to_string(matrix[RowIndex][LastColumnIndex].numerator) + std::string("/") + std::to_string(matrix[RowIndex][LastColumnIndex].denominator)).c_str());
+				} else {
+					// We don't display denominator if it equals to 1
+					ImGui::Text((std::to_string(matrix[RowIndex][LastColumnIndex].numerator)).c_str());
+				}
+				RowIndex++;
+			} else {
+				ImGui::Text("0");
+			}
+		}
+		ImGui::NextColumn();
+	}
+	ImGui::Separator();
+	ImGui::Columns(1);
+
+	if (IsCompleteSolution) {
+		if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+			// Real case
+			ImGui::Text(u8"Минимальное значение функции: F(x)= %f", -matrix[matrix.RowNumber - 1][matrix.ColNumber - 1]);
+		} else {
+			// Fractional case
+			if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1].denominator != 1) {
+				ImGui::Text(u8"Минимальное значение функции: F(x)= %d/%d", -matrix[matrix.RowNumber - 1][matrix.ColNumber - 1].numerator, matrix[matrix.RowNumber - 1][matrix.ColNumber - 1].denominator);
+			} else {
+				ImGui::Text(u8"Минимальное значение функции: F(x)= %d", -matrix[matrix.RowNumber - 1][matrix.ColNumber - 1].numerator);
+			}
+		}
+	}
+}
+
+RowAndColumn CurrentLeadPos;
+template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int StepID, std::vector<int> NumbersOfVariables) {
+	ImDrawList* DrawList = ImGui::GetWindowDrawList();
+
+	ImGui::NewLine();
+	ImGui::Separator();
+	ImGui::NewLine();
+
+	ImGui::Columns(matrix.ColNumber + 1);
+
+	ImGui::Text((std::string("#") + std::to_string(StepID)).c_str());
+	ImGui::NextColumn();
+
+	for (int i = 0; i < matrix.ColNumber - 1; i++) {
+		ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[(matrix.RowNumber - 1) + i])).c_str());
+		ImGui::NextColumn();
+	}
+	ImGui::NextColumn();
+	ImGui::Separator();
+	for (int i = 0; i < matrix.RowNumber; i++) {
+		// Do not display variable name for the last row
+		if (i < matrix.RowNumber - 1) {
+			ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[i])).c_str());
+			ImGui::NextColumn();
+		}
+		for (int j = 0; j < matrix.ColNumber; j++) {
+			if (j == 0 && i == matrix.RowNumber - 1) {
+				ImGui::NextColumn();
+			}
+
+			// Checking algorithm state
+			AlgorithmState state = CheckAlgorithmState(matrix, false, false);
+
+			// Fill with a color chosen cell
+			if (state == CONTINUE && (i == CurrentLeadPos.Row) && (j == CurrentLeadPos.Column)/* && (StepID == ArtificialBasisSteps.size() - 2)*/) {
+				float width = ImGui::GetColumnWidth();
+				float height = ImGui::GetTextLineHeight();
+
+				ImVec2 CursorPos = ImGui::GetCursorScreenPos();
+				DrawList->AddRectFilled(ImVec2(CursorPos.x - 8.0f, CursorPos.y - 4.0f), ImVec2(CursorPos.x + width, CursorPos.y + height + 4.0f), IM_COL32(255 * 0.26f, 255 * 0.59f, 255 * 0.98f, 255));
+			}
+
+			// Output differences
+			if constexpr (std::is_same<MatrixType, Matrix>::value) {
+				// Real case
+				ImGui::Text(std::to_string(matrix[i][j]).c_str());
+			} else {
+				// Fractional case
+				if (matrix[i][j].denominator != 1) {
+					// We display denominator if it doesn't equal to 1
+					ImGui::Text((std::to_string(matrix[i][j].numerator) + std::string("/") + std::to_string(matrix[i][j].denominator)).c_str());
+				} else {
+					// We don't display denominator if it equals to 1
+					ImGui::Text((std::to_string(matrix[i][j].numerator)).c_str());
+				}
+			}
+
+			ImGui::NextColumn();
+		}
+		if (i != matrix.RowNumber - 1) {
+			ImGui::Separator();
+		}
+	}
+
+	ImGui::Columns(1);
+}
+
+void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoefficients) {
+	if (Steps.size() != 0) {
+		for (int i = StartIndex; i < Steps.size(); i++) {
+			if (IsFractionalCoefficients) {
+				DisplayStepOnScreen(Steps[i].FracMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
+			} else {
+				DisplayStepOnScreen(Steps[i].RealMatrix, Steps[i].StepID, Steps[i].NumbersOfVariables);
+			}
+			ImGui::Separator();
+		}
+	}
+}
+
 }

@@ -4,6 +4,7 @@
 #define EPSILON 0.00001f
 
 #define IS_SAME_TYPE(Type1, Type2) (std::is_same<Type1, Type2>::value)
+#define DoesContain(Vector, Element) ((std::find((Vector).begin(), (Vector).end(), (Element))) != (Vector).end())
 
 // Basic math functions
 // --------------------
