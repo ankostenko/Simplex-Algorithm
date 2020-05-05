@@ -630,7 +630,7 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 
 		if (!step.IsCompleted) {
 			// Choose first available leading element
-			if (PreviousStepID != step.StepID) {
+			if (step.StepID == 0 || PreviousStepID != step.StepID) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
 				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
 				PreviousStepID = step.StepID;
