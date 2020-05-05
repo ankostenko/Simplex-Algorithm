@@ -429,6 +429,8 @@ struct Step {
 	bool IsArtificialStep;
 	bool IsSolutionUmlimited;
 
+	Step() = default;
+
 	Step(Matrix RealMatrix, FractionalMatrix FracMatrix) : StepID(0), RealMatrix(RealMatrix), FracMatrix(FracMatrix) { }
 
 	Step(const Step& step) {
