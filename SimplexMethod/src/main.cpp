@@ -526,19 +526,32 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 	}
 }
 
-void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
+template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step step) {
 	static int PreviousStepID = step.StepID;
 
 	if (!step.IsArtificialStep && step.IsCompleted) {
 		return;
 	}
 
-	AlgorithmState state = UNDEFINED;
-	if (IsFractionalCoefficients) {
-		state = CheckAlgorithmState(step.FracMatrix, step.IsAutomatic, step.IsArtificialStep);
+	// Depending on type of matrix choose one of those to use
+	MatrixType matrix;
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		matrix = step.RealMatrix;
 	} else {
-		state = CheckAlgorithmState(step.RealMatrix, step.IsAutomatic, step.IsArtificialStep);
+		matrix = step.FracMatrix;
 	}
+
+	// Type-independent zero element
+	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
+	ElementType ZeroElement;
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		ZeroElement = EPSILON;
+	} else {
+		ZeroElement = Fraction(0, 1);
+	}
+
+	AlgorithmState state = UNDEFINED;
+	state = CheckAlgorithmState(matrix, step.IsAutomatic, step.IsArtificialStep);
 	assert(state != UNDEFINED);
 
 	if (state == UNLIMITED_SOLUTION) {
@@ -555,118 +568,88 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 		static int CurrentCellIndex = 0;
 
 		// Pair of id and column number
-		// TODO: Add multiple minimums support
 		std::vector<RowAndColumn> Leads;
-		if (IsFractionalCoefficients) {
-			std::vector<std::pair<Fraction, int>> MinimumAndRowIndex;
-			for (int i = 0; i < step.FracMatrix.ColNumber - 1; i++) {
-				CurrentRowIndex = -1;
-				Fraction CurrentLead = Fraction(INT32_MAX, 1);
-				Fraction ColumnMinimum = Fraction(INT32_MAX, 1);
-				MinimumAndRowIndex.clear();
-				if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
-					for (int j = 0; j < step.FracMatrix.RowNumber - 1; j++) {
-						if (step.FracMatrix[j][i] > 0) {
-							if (step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i] < ColumnMinimum) {
-								ColumnMinimum = step.FracMatrix[j][step.FracMatrix.ColNumber - 1] / step.FracMatrix[j][i];
-								CurrentLead = step.FracMatrix[j][i];
-								CurrentRowIndex = j;
-								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
-							}
-						}
-					}
-				}
+		std::vector<std::pair<ElementType, int>> MinimumAndRowIndex;
+		for (int i = 0; i < matrix.ColNumber - 1; i++) {
+			CurrentRowIndex = -1;
+			// Assign Fraction of float type
+			ElementType CurrentLead;
+			ElementType ColumnMinimum;
+			if constexpr (IS_SAME_TYPE(ElementType, float)) {
+				CurrentLead = FLT_MAX;
+				ColumnMinimum = FLT_MAX;
+			} else {
+				CurrentLead = Fraction(INT32_MAX, 1);
+				ColumnMinimum = Fraction(INT32_MAX, 1);
+			}
 
-				if (state == CONTINUE && CurrentRowIndex != -1) {
-					// Delete all elements that are not minimum
-					// There can be more than one minimum
-					// I keep all the minimums
-					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
-						auto MR = MinimumAndRowIndex[i];
-						if (MR.first != ColumnMinimum) {
-							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-							i = -1;
-						}
-					}
+			MinimumAndRowIndex.clear();
 
-					if (step.FracMatrix[step.FracMatrix.RowNumber - 1][i] < 0) {
-						ImGui::PushID(i);
-						ImGui::RadioButton((std::to_string(step.FracMatrix[CurrentRowIndex][i].numerator) +
-							std::string("/") + std::to_string(step.FracMatrix[CurrentRowIndex][i].denominator)).c_str(), &Column, i); ImGui::SameLine();
-						ImGui::PopID();
-						// Push possible leading element
-						Leads.push_back(RowAndColumn({ CurrentRowIndex, i }));
+			// Check for negative element
+			if (matrix[matrix.RowNumber - 1][i] < -ZeroElement) {
+				for (int j = 0; j < matrix.RowNumber - 1; j++) {
+					if (matrix[j][i] > ZeroElement) {
+						ElementType TEMPDEBUG = matrix[j][matrix.ColNumber - 1] / matrix[j][i];
+						// We add any elements that are equal to current minimum
+						if (matrix[j][matrix.ColNumber - 1] / matrix[j][i] <= (ColumnMinimum + ZeroElement)) {
+							ColumnMinimum = matrix[j][matrix.ColNumber - 1] / matrix[j][i];
+							CurrentLead = matrix[j][i];
+							CurrentRowIndex = j;
+							MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
+						}
 					}
 				}
 			}
-		} else {
-			std::vector<std::pair<float, int>> MinimumAndRowIndex;
-			for (int i = 0; i < step.RealMatrix.ColNumber - 1; i++) {
-				CurrentRowIndex = -1;
-				float CurrentLead = FLT_MAX;
-				float ColumnMinimum = FLT_MAX;
-				MinimumAndRowIndex.clear();
-				if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-					for (int j = 0; j < step.RealMatrix.RowNumber - 1; j++) {
-						if (step.RealMatrix[j][i] > 0) {
-							if (step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i] < ColumnMinimum) {
-								ColumnMinimum = step.RealMatrix[j][step.RealMatrix.ColNumber - 1] / step.RealMatrix[j][i];
-								CurrentLead = step.RealMatrix[j][i];
-								CurrentRowIndex = j;
-								MinimumAndRowIndex.push_back(std::make_pair(ColumnMinimum, CurrentRowIndex));
-							}
-						}
+
+			if (state == CONTINUE && CurrentRowIndex != -1) {
+				// Delete all elements that are not minimum
+				// There can be more than one minimum
+				// I keep all the minimums
+				for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
+					auto MR = MinimumAndRowIndex[i];
+					// Check if a value not equal to minimum
+					bool IsCurrentNotEqualToMinimum;
+					if constexpr (IS_SAME_TYPE(ElementType, float)) {
+						IsCurrentNotEqualToMinimum = (fabs(MR.first - ColumnMinimum)) > EPSILON;
+					} else {
+						IsCurrentNotEqualToMinimum = (MR.first != ColumnMinimum);
+					}
+
+					if (IsCurrentNotEqualToMinimum) {
+						MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
+						i = -1;
 					}
 				}
 
-				if (state == CONTINUE && CurrentRowIndex != -1) {
-					// Delete all elements that are not minimum
-					// There can be more than one minimum
-					// I keep all the minimums
-					for (int i = 0; i < MinimumAndRowIndex.size(); i++) {
-						auto MR = MinimumAndRowIndex[i];
-						if (fabs(MR.first - ColumnMinimum) > EPSILON) {
-							MinimumAndRowIndex.erase(MinimumAndRowIndex.begin() + i);
-							i = -1;
+				for (std::pair<ElementType, int> MR : MinimumAndRowIndex) {
+					bool IsRowBanned = false;
+					for (auto row : step.RowsBannedToSwap) {
+						if (row == MR.second) {
+							IsRowBanned = true;
 						}
 					}
 
-					for (std::pair<float, int> MR : MinimumAndRowIndex) {
-						// Multiple Minimums
-						int CellIndex = i + MR.second * step.RealMatrix.ColNumber;
-						if (step.RealMatrix[step.RealMatrix.RowNumber - 1][i] < 0) {
-							ImGui::PushID(CellIndex);
-							ImGui::RadioButton(std::to_string(step.RealMatrix[MR.second][i]).c_str(), &CurrentCellIndex, CellIndex); ImGui::SameLine();
-							ImGui::PopID();
-							Leads.push_back(RowAndColumn({ MR.second, i }));
-						}
+					// Multiple Minimums
+					if (!IsRowBanned) {
+						GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
 					}
 				}
 			}
 		}
 
 		if (!step.IsCompleted) {
-			// Extract column nubmer out of cell index
-			Column = CurrentCellIndex % step.RealMatrix.ColNumber;
-			// Extract row number out of cell index
-			int Row = CurrentCellIndex / step.RealMatrix.ColNumber;
-
-			// Resets column to first available element each new step
-			if (PreviousStepID != step.StepID || step.StepID == 0) {
-				Column = Leads[0].Column;
-				Row = Leads[0].Row;
+			// Choose first available leading element
+			if (PreviousStepID != step.StepID) {
+				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
+				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
 				PreviousStepID = step.StepID;
 			}
 
-			// Assign chosen row and column
-			GUILayer::CurrentLeadPos.Column = Column;
-			GUILayer::CurrentLeadPos.Row = Row;
-
-			if (ImGui::Button("Confirm")) {
+			if (ImGui::Button(u8"Подтвердить")) {
 				assert(Column != -1);
 				step.IsWaitingForInput = false;
-				step.LeadElementRC.Column = Column;
-				step.LeadElementRC.Row = Row;
+				step.LeadElementRC.Column = GUILayer::CurrentLeadPos.Column;
+				step.LeadElementRC.Row = GUILayer::CurrentLeadPos.Row;
 				assert(step.LeadElementRC.Row != -1);
 				assert(step.LeadElementRC.Column != -1);
 			}
@@ -676,25 +659,9 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 	}
 
 	if (!step.IsWaitingForInput) {
-		int RowNumber = 0;
-		int ColNumber = 0;
-		// Set appropiate RowNumber and ColNumber according to whether fractional matrix or not 
-		if (IsFractionalCoefficients) {
-			RowNumber = step.FracMatrix.RowNumber;
-			ColNumber = step.FracMatrix.ColNumber;
-		} else {
-			RowNumber = step.RealMatrix.RowNumber;
-			ColNumber = step.RealMatrix.ColNumber;
-		}
-
-
+		int RowNumber = matrix.RowNumber;
 		for (int iteration = 0; iteration < RowNumber; iteration++) {
-			Step NewStep;
-			if (!IsFractionalCoefficients) {
-				NewStep = SimplexStep<Matrix, float>(step);
-			} else {
-				NewStep = SimplexStep<FractionalMatrix, Fraction>(step);
-			}
+			Step NewStep = SimplexStep<MatrixType, ElementType>(step);
 
 			if (NewStep.IsCompleted) {
 				break;
@@ -704,14 +671,15 @@ void SimplexAlgorithm(Step step, bool IsFractionalCoefficients) {
 			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(RowNumber - 1) + NewStep.StepChosenRC.Column]);
 
 			// Disables "confirm" button
-			if (IsFractionalCoefficients) {
-				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
+			if constexpr (IS_SAME_TYPE(ElementType, float)) {
+				// Real case
+				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
 				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
-
 			} else {
-				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
+				// Fractional case
+				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
 				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
@@ -1261,7 +1229,11 @@ int main() {
 						step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 					}
 					GUILayer::DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
-					SimplexAlgorithm(step, IsFractionalCoefficients);
+					if (IsFractionalCoefficients) {
+						SimplexAlgorithm<FractionalMatrix, Fraction>(step);
+					} else {
+						SimplexAlgorithm<Matrix, float>(step);
+					}
 
 					// Display Solution
 					if (IsFractionalCoefficients) {

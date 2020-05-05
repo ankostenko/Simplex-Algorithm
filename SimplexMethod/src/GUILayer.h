@@ -5,7 +5,6 @@ namespace GUILayer {
 const char* ComboBoxVariablesLabel = u8"Число переменных ";
 const char* ComboBoxLimitationsLabel = u8"Число ограничений";
 
-// TODO: Fix alignment of labels
 int ComboBox(const char *label) {
 	const char* values[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16" };
 	static int CallNumber = 0;
