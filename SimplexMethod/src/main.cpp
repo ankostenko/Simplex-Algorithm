@@ -131,15 +131,12 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 	assert(state != UNDEFINED);
 
 	if (state == UNLIMITED_SOLUTION) {
-		printf("Solution is unlimited");
 		step.IsCompleted = true;
 		return step;
 	} else if (state == COMPLETED) {
-		printf("Algorithm is completed");
 		step.IsCompleted = true;
 		return step;
 	} else if (state == SOLUTION_DOESNT_EXIST) {
-		printf("Solution doesn't exist");
 		step.IsCompleted = true;
 		return step;
 	}
@@ -372,14 +369,10 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 	state = CheckAlgorithmState(matrix, step.IsAutomatic, step.IsArtificialStep);
 
 	if (state == UNLIMITED_SOLUTION) {
-		printf("Solution is unlimited");
 		step.IsCompleted = true;
 	} else if (state == COMPLETED) {
-		printf("Algorithm is completed");
 		step.IsCompleted = true;
 	} else if (state == SOLUTION_DOESNT_EXIST) {
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), "Solution doesn't exist!");
-		printf("Solution doesn't exist");
 		step.IsCompleted = true;
 	}
 
@@ -527,6 +520,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 }
 
 template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step step) {
+	GUILayer::PotentialLeads.clear();
 	static int PreviousStepID = step.StepID;
 
 	if (!step.IsArtificialStep && step.IsCompleted) {
@@ -628,11 +622,8 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 							IsRowBanned = true;
 						}
 					}
-
-					// Multiple Minimums
-					if (!IsRowBanned) {
-						GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
-					}
+					GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
+					
 				}
 			}
 		}
