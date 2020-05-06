@@ -12,6 +12,10 @@
 		[x] В пошаговом режиме возможность выбора опорного элемента.
 		[x] Поддержка мыши.
 */
+
+// BUG: Program doesn't show anything if there's no any negative elements in columns and result is negative. (Should show doesn't have solutions(?))
+
+
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
@@ -1008,27 +1012,24 @@ int main() {
 
 			SizeConfirmedReadyToContinue = true;
 		}
-
+		ImGui::SameLine(); GUILayer::HelpMarker(u8"Размерность будет изменена только после нажатия кнопки 'Применить'.");
 		ImGui::Separator();
 
 		// Size is confirmed we can proceed further
 		if (SizeConfirmedReadyToContinue) {
 			// Choose between real number and fractions
-			ImGui::Text(u8"Выбор типа элементов");
-			ImGui::RadioButton(u8"Действительные числа", &UnconfirmedIsFractionalCoefficients, 0); ImGui::SameLine();
-			ImGui::RadioButton(u8"Обыкновенные дроби",   &UnconfirmedIsFractionalCoefficients, 1);
+			ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+			ImGui::Combo(u8"Тип элементов", &UnconfirmedIsFractionalCoefficients, u8"Действительные числа\0Обыкновенные дроби\0");
 			ImGui::Separator();
 
 			// Choose between explicit and artificial basis
-			ImGui::Text(u8"Выбор базиса");
-			ImGui::RadioButton(u8"Явный базис",			&UnconfirmedIsArtificialBasis, 0); ImGui::SameLine();
-			ImGui::RadioButton(u8"Искусственный базис", &UnconfirmedIsArtificialBasis, 1);
+			ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+			ImGui::Combo(u8"Тип базиса", &UnconfirmedIsArtificialBasis, u8"Явный базис\0Искусственный базис\0");
 			ImGui::Separator();
 
 			// Choose between step by step and automatic solution modes
-			ImGui::Text(u8"Режим решения");
-			ImGui::RadioButton(u8"Пошаговый", &UnconfirmedIsAutomatic, 0);
-			ImGui::SameLine(); ImGui::RadioButton(u8"Автоматический", &UnconfirmedIsAutomatic, 1);
+			ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+			ImGui::Combo(u8"Режим решения", &UnconfirmedIsAutomatic, u8"Пошаговый\0Автоматический\0");
 			ImGui::Separator();
 
 			// Apply all properties and continue
@@ -1049,6 +1050,7 @@ int main() {
 				IsArtificialBasis = UnconfirmedIsArtificialBasis;
 				IsAutomatic = UnconfirmedIsAutomatic;
 			}
+			ImGui::SameLine(); GUILayer::HelpMarker(u8"Параметры решения изменяются только после нажатия кнопки 'Применить'.");
 			ImGui::PopID();
 
 			ImGui::Separator();
@@ -1096,6 +1098,7 @@ int main() {
 			// Matrix of limitations
 			ImGui::PushID("Matrix");
 			ImGui::Text(u8"Матрица ограничений");
+			ImGui::SameLine(); GUILayer::HelpMarker(u8"*Внутри этого блока переключаться между элементами можно с помощью клавиши Tab.\n*Изменить ширину столбца можно потянув за вертикальный разделитель.");
 			// Group
 			ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 140, 0.0f));
 			ImGui::BeginChild("Matrix Of Limitations", ImVec2(0, ImGui::GetFontSize() * RealMatrix.RowNumber * 2), false, ImGuiWindowFlags_HorizontalScrollbar);
@@ -1159,6 +1162,7 @@ int main() {
 				PreviousSimplexStepID = -1;
 				PreviousArtificialStepID = -1;
 			}
+			GUILayer::HelpMarker(u8"'Решить' при повторном нажатии начинает решение сначала."); ImGui::SameLine();
 
 			if (ShowSolution) {
 				ImGui::SameLine();

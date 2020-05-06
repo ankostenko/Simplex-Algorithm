@@ -5,6 +5,17 @@ namespace GUILayer {
 const char* ComboBoxVariablesLabel = u8"Число переменных ";
 const char* ComboBoxLimitationsLabel = u8"Число ограничений";
 
+static void HelpMarker(const char* desc) {
+	ImGui::TextDisabled("(?)");
+	if (ImGui::IsItemHovered()) {
+		ImGui::BeginTooltip();
+		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+		ImGui::TextUnformatted(desc);
+		ImGui::PopTextWrapPos();
+		ImGui::EndTooltip();
+	}
+}
+
 int ComboBox(const char *label) {
 	const char* values[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16" };
 	static int CallNumber = 0;
