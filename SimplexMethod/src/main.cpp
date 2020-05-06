@@ -193,7 +193,7 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 				}
 				if (IsRowBannedToSwap) { continue; }
 			}
-			
+
 			if (matrix[i][CurrentColumnIndex] > ZeroElement) {
 				if (matrix[i][matrix.ColNumber - 1] / matrix[i][CurrentColumnIndex] < ColumnMinimum) {
 					CurrentLead = matrix[i][CurrentColumnIndex];
@@ -612,10 +612,8 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 	assert(state != UNDEFINED);
 
 	if (state == UNLIMITED_SOLUTION) {
-		printf("UNLIMITED SOLUTION\n");
 		step.IsCompleted = true;
 	} else if (state == COMPLETED) {
-		printf("COMPLETED\n");
 		step.IsCompleted = true;
 	}
 
@@ -1154,9 +1152,10 @@ int main() {
 		//		VERIFIED UNTIL THAT POINT
 		// ====================================
 
+		// Jump here if window was closed
+		BeforeShowSolutionTarget:
 		if (ShowSolution) {
-			ImGui::Begin(u8"Решение", &ShowSolution, ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
-
+			ImGui::Begin(u8"Решение", &ShowSolution, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 			// If solution window was closed we need to restore state to non-solved
 			if (ShowSolution == false) {
 				Step FirstStep = ArtificialBasisSteps[0];
@@ -1167,6 +1166,8 @@ int main() {
 				StartSimplexAlgorithm = false;
 				PreviousSimplexStepID = -1;
 				PreviousArtificialStepID = -1;
+				ImGui::End();
+				goto BeforeShowSolutionTarget;
 			}
 
 			ImGui::BeginTabBar("Solutions");
@@ -1222,16 +1223,16 @@ int main() {
 					}
 
 					// Display all steps that has been calculated
-//					ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
-//					ImGui::BeginChild("Matrix Of Limitations", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoResize);
+					ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
+					ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f), true, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
 					GUILayer::DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
-					//ArtificialBasis(step, IsFractionalCoefficients);
 					if (!IsFractionalCoefficients) {
 						ArtificialBasis<Matrix, float>(step);
 					} else {
 						ArtificialBasis<FractionalMatrix, Fraction>(step);
 					}
-					//					ImGui::EndChild();
+					ImGui::Separator();
+					ImGui::EndChild();
 					ImGui::EndTabItem();
 				}
 			} else {
@@ -1300,10 +1301,12 @@ int main() {
 				}
 			}
 
+			ImGui::Separator();
 
 			// Sholution has been found
 			if (step.IsCompleted && step.IsArtificialStep) {
-				ImGui::BeginChild("Solution", ImVec2(0, 0), true);
+				ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
+				ImGui::BeginChild("Solution", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, 130.0f), true, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
 				ImGui::Text(u8"Ответ");
 				ImGui::Separator();
 
@@ -1368,12 +1371,15 @@ int main() {
 						step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 					}
 					ImGui::PushID("Simplex Algorithm");
+					ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
+					ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f), true, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
 					GUILayer::DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
 					if (IsFractionalCoefficients) {
 						SimplexAlgorithm<FractionalMatrix, Fraction>(step);
 					} else {
 						SimplexAlgorithm<Matrix, float>(step);
 					}
+					ImGui::EndChild();
 					ImGui::PopID();
 
 					// Display Solution
@@ -1417,10 +1423,10 @@ int main() {
 					ImGui::EndTabItem();
 				}
 			}
-
 			ImGui::EndTabBar();
 			ImGui::End();
 		}
+
 
 		ImGui::Render();
 		int display_w, display_h;
