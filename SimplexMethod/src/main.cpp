@@ -57,8 +57,10 @@ AlgorithmState CheckAlgorithmState(Matrix& matrix, bool IsAutomatic, bool IsArti
 		state = COMPLETED;
 
 		// Check if system of equalities have solutions
-		if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] < -EPSILON) {
-			state = SOLUTION_DOESNT_EXIST;
+		if (IsArtificialStep) {
+			if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] < -EPSILON) {
+				state = SOLUTION_DOESNT_EXIST;
+			}
 		}
 	}
 
@@ -91,8 +93,10 @@ AlgorithmState CheckAlgorithmState(FractionalMatrix& matrix, bool IsAutomatic, b
 		state = COMPLETED;
 
 		// Check if system of equalities have solutions
-		if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] < -EPSILON) {
-			state = SOLUTION_DOESNT_EXIST;
+		if (IsArtificialStep) {
+			if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] < -EPSILON) {
+				state = SOLUTION_DOESNT_EXIST;
+			}
 		}
 	}
 
@@ -500,7 +504,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 			}
 		}
 
-		if (!step.IsCompleted) {
+		if (!step.IsCompleted && GUILayer::PotentialLeads.size() != 0) {
 			// Choose first available leading element
 			if (PreviousStepID != step.StepID) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
@@ -543,13 +547,13 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 			// Disables "confirm" button
 			if constexpr (IS_SAME_TYPE(ElementType, float)) {
 				// Real case
-				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
+				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, NewStep.IsArtificialStep);
 				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
 			} else {
 				// Fractional case
-				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
+				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, NewStep.IsArtificialStep);
 				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
@@ -677,7 +681,7 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 
 		if (!step.IsCompleted) {
 			// Choose first available leading element
-			if (PreviousStepID != step.StepID) {
+			if (PreviousStepID != step.StepID && GUILayer::PotentialLeads.size() != 0) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
 				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
 				PreviousStepID = step.StepID;
@@ -711,13 +715,13 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 			// Disables "confirm" button
 			if constexpr (IS_SAME_TYPE(ElementType, float)) {
 				// Real case
-				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, false);
+				AlgorithmState state = CheckAlgorithmState(NewStep.RealMatrix, false, NewStep.IsArtificialStep);
 				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
 			} else {
 				// Fractional case
-				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, false);
+				AlgorithmState state = CheckAlgorithmState(NewStep.FracMatrix, false, NewStep.IsArtificialStep);
 				if (state == COMPLETED) {
 					NewStep.IsCompleted = true;
 				}
@@ -1255,7 +1259,18 @@ int main() {
 					}
 
 					ImGui::PushID("Explicit Basis Displaying");
-					GUILayer::DisplaySteps(ExplicitBasisSteps, 0, IsFractionalCoefficients);
+					ImGui::BeginChild("Solution", ImVec2(0, 100), true);
+					ImGui::Text(u8"Ответ");
+					ImGui::Separator();
+					if (IsFractionalCoefficients) {
+						// Fractional case
+						GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, false);
+					} else {
+						// Real case
+						GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, false);
+					}
+					ImGui::EndChild();
+
 					if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
 						StartSimplexAlgorithm = true;
 						SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
@@ -1330,7 +1345,7 @@ int main() {
 						size_t LastSimplexAlgorithmElementIndex = SimplexAlgorithmSteps.size() - 1;
 						step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 					}
-					ImGui::PushID("FUKASJD;FLJASL;DFJASDF");
+					ImGui::PushID("Simplex Algorithm");
 					GUILayer::DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
 					if (IsFractionalCoefficients) {
 						SimplexAlgorithm<FractionalMatrix, Fraction>(step);
@@ -1341,7 +1356,7 @@ int main() {
 
 					// Display Solution
 					if (IsFractionalCoefficients) {
-						AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, false);
+						AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, step.IsArtificialStep);
 						if (state != CONTINUE) {
 							ImGui::BeginChild("Solution", ImVec2(0, 0), true);
 							ImGui::Text(u8"Ответ");
@@ -1359,7 +1374,7 @@ int main() {
 							ImGui::EndChild();
 						}
 					} else {
-						AlgorithmState state = CheckAlgorithmState(step.RealMatrix, false, false);
+						AlgorithmState state = CheckAlgorithmState(step.RealMatrix, false, step.IsArtificialStep);
 						if (state != CONTINUE) {
 							ImGui::BeginChild("Solution", ImVec2(0, 0), true);
 							ImGui::Text(u8"Ответ");

@@ -234,7 +234,6 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 			if (state == CONTINUE) {
 				float width = ImGui::GetColumnWidth();
 				
-				printf("CURRENT LEAD POS: %d-%d\n", CurrentLeadPos.Row, CurrentLeadPos.Column);
 				for (RowAndColumn ElementRC : PotentialLeads) {
 					if (ElementRC.Row == i && ElementRC.Column == j && IsLastIteration) {
 						ImGui::PushID(j + i * matrix.ColNumber);
@@ -244,7 +243,6 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4((float)211 / 255, (float)84 / 255, (float)0 / 255, 1.0f));
 							if (ImGui::Button(CellLabel.c_str(), ImVec2(width - 15.0f, ImGui::GetTextLineHeight() * 1.3f))) {
 								CurrentLeadPos = ElementRC;
-								printf("Active: %d-%d\n", CurrentLeadPos.Row, CurrentLeadPos.Column);
 							}
 							ImGui::PopStyleColor(); ImGui::PopStyleColor(); ImGui::PopStyleColor();
 						} else {
@@ -253,7 +251,6 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4((float)211 / 255, (float)84 / 255, (float)0 / 255, 1.0f));
 							if (ImGui::Button(CellLabel.c_str(), ImVec2(width - 15.0f, ImGui::GetTextLineHeight() * 1.3f))) {
 								CurrentLeadPos = ElementRC;
-								printf("Unactive: %d-%d\n", CurrentLeadPos.Row, CurrentLeadPos.Column);
 							}
 							ImGui::PopStyleColor(); ImGui::PopStyleColor(); ImGui::PopStyleColor();
 						}
