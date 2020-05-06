@@ -184,6 +184,16 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 
 		// Choose any available lead element
 		for (int i = 0; i < matrix.RowNumber - 1; i++) {
+			if (step.IsArtificialStep) {
+				bool IsRowBannedToSwap = false;
+				for (auto RowNumber : step.RowsBannedToSwap) {
+					if (RowNumber == i) {
+						IsRowBannedToSwap = true;
+					}
+				}
+				if (IsRowBannedToSwap) { continue; }
+			}
+			
 			if (matrix[i][CurrentColumnIndex] > ZeroElement) {
 				if (matrix[i][matrix.ColNumber - 1] / matrix[i][CurrentColumnIndex] < ColumnMinimum) {
 					CurrentLead = matrix[i][CurrentColumnIndex];
@@ -389,6 +399,7 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 	step.FracMatrix[step.FracMatrix.RowNumber - 1][step.FracMatrix.ColNumber - 1] = -ColumnSum;
 }
 
+static int PreviousArtificialStepID = -1;
 template<typename MatrixType, typename ElementType> void ArtificialBasis(Step step) {
 	// Clear all leads each new iteration
 	GUILayer::PotentialLeads.clear();
@@ -410,7 +421,6 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 		ZeroElement = Fraction(0, 1);
 	}
 
-	static int PreviousStepID = -1;
 
 	if (step.IsArtificialStep && step.IsCompleted) {
 		return;
@@ -506,10 +516,10 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 
 		if (!step.IsCompleted && GUILayer::PotentialLeads.size() != 0) {
 			// Choose first available leading element
-			if (PreviousStepID != step.StepID) {
+			if (PreviousArtificialStepID != step.StepID) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
 				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
-				PreviousStepID = step.StepID;
+				PreviousArtificialStepID = step.StepID;
 			}
 
 			if (ImGui::Button(u8"Подтвердить")) {
@@ -523,6 +533,8 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 		}
 
 		ImGui::PopID();
+	} else {
+		step.IsWaitingForInput = false;
 	}
 
 	if (!step.IsWaitingForInput) {
@@ -570,9 +582,9 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 	}
 }
 
+static int PreviousSimplexStepID = -1;
 template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step step) {
 	GUILayer::PotentialLeads.clear();
-	static int PreviousStepID = -1;
 
 	if (!step.IsArtificialStep && step.IsCompleted) {
 		return;
@@ -600,8 +612,10 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 	assert(state != UNDEFINED);
 
 	if (state == UNLIMITED_SOLUTION) {
+		printf("UNLIMITED SOLUTION\n");
 		step.IsCompleted = true;
 	} else if (state == COMPLETED) {
+		printf("COMPLETED\n");
 		step.IsCompleted = true;
 	}
 
@@ -681,10 +695,10 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 
 		if (!step.IsCompleted) {
 			// Choose first available leading element
-			if (PreviousStepID != step.StepID && GUILayer::PotentialLeads.size() != 0) {
+			if (PreviousSimplexStepID != step.StepID && GUILayer::PotentialLeads.size() != 0) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
 				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
-				PreviousStepID = step.StepID;
+				PreviousSimplexStepID = step.StepID;
 			}
 
 			if (ImGui::Button(u8"Подтвердить")) {
@@ -698,6 +712,8 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 		}
 
 		ImGui::PopID();
+	} else {
+		step.IsWaitingForInput = false;
 	}
 
 	if (!step.IsWaitingForInput) {
@@ -1128,6 +1144,8 @@ int main() {
 					ExplicitBasisSteps.clear();
 					ShowSolution = false;
 					StartSimplexAlgorithm = false;
+					PreviousSimplexStepID = -1;
+					PreviousArtificialStepID = -1;
 				}
 			}
 		}
@@ -1147,6 +1165,8 @@ int main() {
 				SimplexAlgorithmSteps.clear();
 				ExplicitBasisSteps.clear();
 				StartSimplexAlgorithm = false;
+				PreviousSimplexStepID = -1;
+				PreviousArtificialStepID = -1;
 			}
 
 			ImGui::BeginTabBar("Solutions");
@@ -1318,6 +1338,7 @@ int main() {
 							step.RealMatrix = ArtificialBasisSteps[LastElementIndex].RealMatrix;
 							step.FracMatrix = ArtificialBasisSteps[LastElementIndex].FracMatrix;
 							step.NumbersOfVariables = ArtificialBasisSteps[LastElementIndex].NumbersOfVariables;
+							step.IsCompleted = false;
 							if (IsFractionalCoefficients) {
 								MakeSimplexAlgorithmFunctionCoefficients(step, FractionalTargetFunction);
 							} else {
@@ -1328,6 +1349,7 @@ int main() {
 							step.RealMatrix = ExplicitBasisSteps[LastElementIndex].RealMatrix;
 							step.FracMatrix = ExplicitBasisSteps[LastElementIndex].FracMatrix;
 							step.NumbersOfVariables = ExplicitBasisSteps[LastElementIndex].NumbersOfVariables;
+							step.IsCompleted = false;
 							if (IsFractionalCoefficients) {
 								MakeSimplexAlgorithmFunctionCoefficients(step, FractionalTargetFunction);
 							} else {
