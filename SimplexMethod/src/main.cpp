@@ -1149,6 +1149,15 @@ int main() {
 
 			if (ImGui::Button(u8"Решить")) {
 				ShowSolution = true;
+
+				Step FirstStep = ArtificialBasisSteps[0];
+				ArtificialBasisSteps.clear();
+				ArtificialBasisSteps.push_back(FirstStep);
+				SimplexAlgorithmSteps.clear();
+				ExplicitBasisSteps.clear();
+				StartSimplexAlgorithm = false;
+				PreviousSimplexStepID = -1;
+				PreviousArtificialStepID = -1;
 			}
 
 			if (ShowSolution) {
