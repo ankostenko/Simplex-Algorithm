@@ -889,8 +889,14 @@ int main() {
 	int IsAutomatic = 1;
 	int SizeConfirmedClicked = 0;
 	int OldSizeCondfirmedClicked = 0;
+	
 	int IsArtificialBasis = true;
 	int IsFractionalCoefficients = 0;
+	
+	int UnconfirmedIsArtificialBasis = true;
+	int UnconfirmedIsFractionalCoefficients = 0;
+	int UnconfirmedIsAutomatic = 1;
+	
 	bool ShowSolution = false;
 	bool StartSimplexAlgorithm = false;
 	bool SizeConfirmedReadyToContinue = false;
@@ -1009,26 +1015,39 @@ int main() {
 		if (SizeConfirmedReadyToContinue) {
 			// Choose between real number and fractions
 			ImGui::Text(u8"Выбор типа элементов");
-			ImGui::RadioButton(u8"Действительные числа", &IsFractionalCoefficients, 0); ImGui::SameLine();
-			ImGui::RadioButton(u8"Обыкновенные дроби", &IsFractionalCoefficients, 1);
+			ImGui::RadioButton(u8"Действительные числа", &UnconfirmedIsFractionalCoefficients, 0); ImGui::SameLine();
+			ImGui::RadioButton(u8"Обыкновенные дроби",   &UnconfirmedIsFractionalCoefficients, 1);
 			ImGui::Separator();
 
 			// Choose between explicit and artificial basis
 			ImGui::Text(u8"Выбор базиса");
-			ImGui::RadioButton(u8"Явный базис", &IsArtificialBasis, 0); ImGui::SameLine();
-			ImGui::RadioButton(u8"Искусственный базис", &IsArtificialBasis, 1);
+			ImGui::RadioButton(u8"Явный базис",			&UnconfirmedIsArtificialBasis, 0); ImGui::SameLine();
+			ImGui::RadioButton(u8"Искусственный базис", &UnconfirmedIsArtificialBasis, 1);
 			ImGui::Separator();
 
 			// Choose between step by step and automatic solution modes
 			ImGui::Text(u8"Режим решения");
-			ImGui::RadioButton(u8"Пошаговый", &IsAutomatic, 0);
-			ImGui::SameLine(); ImGui::RadioButton(u8"Автоматический", &IsAutomatic, 1);
+			ImGui::RadioButton(u8"Пошаговый", &UnconfirmedIsAutomatic, 0);
+			ImGui::SameLine(); ImGui::RadioButton(u8"Автоматический", &UnconfirmedIsAutomatic, 1);
 			ImGui::Separator();
 
 			// Apply all properties and continue
 			ImGui::PushID("Properties Apply");
 			if (ImGui::Button(u8"Применить")) {
 				ContinueToProblemInput = true;
+				Step FirstStep = ArtificialBasisSteps[0];
+				ArtificialBasisSteps.clear();
+				ArtificialBasisSteps.push_back(FirstStep);
+				SimplexAlgorithmSteps.clear();
+				ExplicitBasisSteps.clear();
+				ShowSolution = false;
+				StartSimplexAlgorithm = false;
+				PreviousSimplexStepID = -1;
+				PreviousArtificialStepID = -1;
+
+				IsFractionalCoefficients = UnconfirmedIsFractionalCoefficients;
+				IsArtificialBasis = UnconfirmedIsArtificialBasis;
+				IsAutomatic = UnconfirmedIsAutomatic;
 			}
 			ImGui::PopID();
 
