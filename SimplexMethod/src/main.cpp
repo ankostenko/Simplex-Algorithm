@@ -305,6 +305,53 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<float>& Re
 	step.RealMatrix[step.RealMatrix.RowNumber - 1][step.RealMatrix.ColNumber - 1] = -ColumnSum;
 }
 
+template<typename MatrixType, typename ElementType> void MakeSimplexAlgorithmFunctionCoefficients(MatrixType& matrix, std::vector<int> NumbersOfVariables, std::vector<ElementType>& TargetFunction) {
+	MatrixType TargetFunctionCoefficientsMatrix(matrix);
+
+	// Type-independent zero element
+	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
+	ElementType ZeroElement;
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		ZeroElement = EPSILON;
+	} else {
+		ZeroElement = Fraction(0, 1);
+	}
+
+	// Copy table one to one multiplying basis rows on coefficients of target function
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		for (int j = 0; j < matrix.ColNumber; j++) {
+			if (j < matrix.ColNumber - 1) {
+				TargetFunctionCoefficientsMatrix[i][j] = TargetFunction[NumbersOfVariables[i] - 1] * matrix[i][j] * (-1);
+			} else {
+				TargetFunctionCoefficientsMatrix[i][j] = TargetFunction[NumbersOfVariables[i] - 1] * matrix[i][j];
+			}
+		}
+	}
+
+	// Fill new target function coefficients
+	for (int i = 0; i < TargetFunctionCoefficientsMatrix.ColNumber - 1; i++) {
+		ElementType ColumnSum;
+		if constexpr (IS_SAME_TYPE(ElementType, float)) {
+			ColumnSum = 0.0f;
+		} else {
+			ColumnSum = Fraction(0, 1);
+		}
+		for (int j = 0; j < TargetFunctionCoefficientsMatrix.RowNumber - 1; j++) {
+			ColumnSum = ColumnSum + TargetFunctionCoefficientsMatrix[j][i];
+		}
+		ColumnSum = ColumnSum + TargetFunction[NumbersOfVariables[i + matrix.RowNumber - 1] - 1];
+		matrix[matrix.RowNumber - 1][i] = ColumnSum;
+	}
+
+	// Free coefficient
+	ElementType ColumnSum = ZeroElement;
+	for (int i = 0; i < TargetFunctionCoefficientsMatrix.RowNumber - 1; i++) {
+		ColumnSum = ColumnSum + TargetFunctionCoefficientsMatrix[i][TargetFunctionCoefficientsMatrix.ColNumber - 1];
+	}
+	ColumnSum = ColumnSum + TargetFunction[TargetFunction.size() - 1];
+	matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] = -ColumnSum;
+}
+
 void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>& FracTargetFunction) {
 	FractionalMatrix TargetFunctionCoefficientsMatrix(step.FracMatrix);
 
@@ -341,7 +388,7 @@ void MakeSimplexAlgorithmFunctionCoefficients(Step& step, std::vector<Fraction>&
 template<typename MatrixType, typename ElementType> void ArtificialBasis(Step step) {
 	// Clear all leads each new iteration
 	GUILayer::PotentialLeads.clear();
-	
+
 	// Depending on type of matrix choose one of those to use
 	MatrixType matrix;
 	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
@@ -359,7 +406,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 		ZeroElement = Fraction(0, 1);
 	}
 
-	static int PreviousStepID = step.StepID;
+	static int PreviousStepID = -1;
 
 	if (step.IsArtificialStep && step.IsCompleted) {
 		return;
@@ -453,7 +500,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 			}
 		}
 
-		if (!step.IsCompleted) {		
+		if (!step.IsCompleted) {
 			// Choose first available leading element
 			if (PreviousStepID != step.StepID) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
@@ -521,7 +568,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 
 template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step step) {
 	GUILayer::PotentialLeads.clear();
-	static int PreviousStepID = step.StepID;
+	static int PreviousStepID = -1;
 
 	if (!step.IsArtificialStep && step.IsCompleted) {
 		return;
@@ -623,14 +670,14 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 						}
 					}
 					GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
-					
+
 				}
 			}
 		}
 
 		if (!step.IsCompleted) {
 			// Choose first available leading element
-			if (step.StepID == 0 || PreviousStepID != step.StepID) {
+			if (PreviousStepID != step.StepID) {
 				GUILayer::CurrentLeadPos.Column = GUILayer::PotentialLeads[0].Column;
 				GUILayer::CurrentLeadPos.Row = GUILayer::PotentialLeads[0].Row;
 				PreviousStepID = step.StepID;
@@ -688,23 +735,34 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 	}
 }
 
-void GaussElimination(Matrix& matrix) {
+template<typename MatrixType, typename ElementType> void GaussElimination(MatrixType& matrix) {
 	int PivotRow = 0;
 	int PivotColumn = 0;
 	int num = 2;
 
+	// Type-independent zero element
+	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
+	ElementType ZeroElement;
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		ZeroElement = EPSILON;
+	} else {
+		ZeroElement = Fraction(0, 1);
+	}
+
 	while (PivotRow < (matrix.RowNumber - 1) && PivotColumn < matrix.ColNumber - 1) {
 		// Find max value in a column
-		float MaxPivot = fabs(matrix[PivotRow][PivotColumn]);
+		ElementType MaxPivot;
+		MaxPivot = Genfabs(matrix[PivotRow][PivotColumn]);
+
 		int MaxPivotIdx = PivotRow;
 		for (int i = PivotRow; i < matrix.RowNumber - PivotRow - 1 - 1; i++) {
-			if (fabs(matrix[i][PivotColumn]) > MaxPivot) {
-				MaxPivot = fabs(matrix[i][PivotColumn]);
+			if (Genfabs(matrix[i][PivotColumn]) > MaxPivot) {
+				MaxPivot = Genfabs(matrix[i][PivotColumn]);
 				MaxPivotIdx = i;
 			}
 		}
 
-		if (fabs(matrix[MaxPivotIdx][PivotColumn]) < EPSILON) {
+		if (Genfabs(matrix[MaxPivotIdx][PivotColumn]) <= ZeroElement) {
 			PivotColumn += 1;
 		} else {
 			matrix.SwapRows(PivotRow, MaxPivotIdx);
@@ -712,8 +770,12 @@ void GaussElimination(Matrix& matrix) {
 			// Substract all rows below pivot
 			for (int i = PivotRow + 1; i < matrix.RowNumber - 1; i++) {
 
-				float Factor = matrix[i][PivotColumn] / matrix[PivotRow][PivotColumn];
-				matrix[i][PivotColumn] = 0.0f;
+				ElementType Factor = matrix[i][PivotColumn] / matrix[PivotRow][PivotColumn];
+				if constexpr (IS_SAME_TYPE(ElementType, float)) {
+					matrix[i][PivotColumn] = 0.0f;
+				} else {
+					matrix[i][PivotColumn] = Fraction(0, 1);
+				}
 
 				for (int j = PivotColumn + 1; j < matrix.ColNumber; j++) {
 					matrix[i][j] = matrix[i][j] - matrix[PivotRow][j] * Factor;
@@ -727,38 +789,56 @@ void GaussElimination(Matrix& matrix) {
 
 	// Backward substitution
 	for (int i = matrix.RowNumber - 2; i > 0; i--) {
-		if (fabs(matrix[i][i]) < EPSILON) continue;
+		if (Genfabs(matrix[i][i]) <= ZeroElement) continue;
 		for (int j = i; j > 0; j--) {
-			float Factor = matrix[j - 1][i] / matrix[i][i];
+			ElementType Factor = matrix[j - 1][i] / matrix[i][i];
 			for (int k = i; k < matrix.ColNumber - 1; k++) {
-				matrix[j - 1][k] -= matrix[i][k] * Factor;
+				matrix[j - 1][k] = matrix[j - 1][k] - matrix[i][k] * Factor;
 			}
 
-			matrix[j - 1][matrix.ColNumber - 1] -= matrix[i][matrix.ColNumber - 1] * Factor;
+			matrix[j - 1][matrix.ColNumber - 1] = matrix[j - 1][matrix.ColNumber - 1] - matrix[i][matrix.ColNumber - 1] * Factor;
 		}
 	}
 
 	// Normalization
 	for (int i = 0; i < matrix.RowNumber - 1; i++) {
-		float Pivot = matrix[i][i];
-		if (fabs(Pivot) < EPSILON) continue;
+		ElementType Pivot = matrix[i][i];
+		if (Genfabs(Pivot) <= ZeroElement) continue;
 		for (int j = i; j < matrix.ColNumber; j++) {
-			matrix[i][j] /= Pivot;
+			matrix[i][j] = matrix[i][j] / Pivot;
 		}
 	}
 }
 
-Step ExplicitBasis(Step step, std::vector<float>& RealExplicitBasis, std::vector<float>& RealTargetFunction) {
+void Print(Matrix& matrix) {
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		for (int j = 0; j < matrix.ColNumber; j++) {
+			printf("%f ", matrix[i][j]);
+		}
+		printf("\n");
+	}
+}
+
+template<typename MatrixType, typename ElementType>Step ExplicitBasis(Step step, MatrixType& matrix, std::vector<ElementType>& ExplicitBasis, std::vector<ElementType>& TargetFunction) {
+	// Type-independent zero element
+	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
+	ElementType ZeroElement;
+	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+		ZeroElement = EPSILON;
+	} else {
+		ZeroElement = Fraction(0, 1);
+	}
+
 	// 1. Prepare matrix to Gauss elimination
 	std::vector<int> PositionsOfNonZeroElements;
 	std::vector<int> VariablesPositions;
-	for (int i = 0; i < RealExplicitBasis.size(); i++) {
+	for (int i = 0; i < ExplicitBasis.size(); i++) {
 		VariablesPositions.push_back(i + 1);
 	}
 
 	// 1.1 Find positions of non-zero elements
-	for (int i = 0; i < RealExplicitBasis.size(); i++) {
-		if (fabs(RealExplicitBasis[i]) > EPSILON) {
+	for (int i = 0; i < ExplicitBasis.size(); i++) {
+		if (Genfabs(ExplicitBasis[i]) >= ZeroElement) {
 			PositionsOfNonZeroElements.push_back(i);
 		}
 	}
@@ -766,26 +846,22 @@ Step ExplicitBasis(Step step, std::vector<float>& RealExplicitBasis, std::vector
 	// 1.2 Swap matrix column and variables to first (RowNumber) columns
 	for (int i = 0; i < PositionsOfNonZeroElements.size(); i++) {
 		int NonZeroPosition = PositionsOfNonZeroElements[i];
-		step.RealMatrix.SwapColumns(i, NonZeroPosition);
+		matrix.SwapColumns(i, NonZeroPosition);
 		std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
 	}
 
 	// 2. Gauss Elimination
-	GaussElimination(step.RealMatrix);
+	GaussElimination<MatrixType, ElementType>(matrix);
 
 	// 3. Complete table for first step of simplex alogrithm
 	// 3.1 Delete first RowNumber columns
-	for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
-		step.RealMatrix.DeleteColumn(0);
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		matrix.DeleteColumn(0);
 	}
 
 	step.NumbersOfVariables = VariablesPositions;
-	MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
+	MakeSimplexAlgorithmFunctionCoefficients(matrix, step.NumbersOfVariables, TargetFunction);
 	return step;
-}
-
-void func(const char *text) {
-
 }
 
 int main() {
@@ -960,7 +1036,6 @@ int main() {
 								ImGui::Text((std::string("x") + std::to_string(i + 1)).c_str());
 								ImGui::NextColumn();
 							}
-							ImGui::NextColumn();
 						});
 					ImGui::PopID();
 				} else {
@@ -1046,6 +1121,7 @@ int main() {
 					ArtificialBasisSteps.clear();
 					ArtificialBasisSteps.push_back(FirstStep);
 					SimplexAlgorithmSteps.clear();
+					ExplicitBasisSteps.clear();
 					ShowSolution = false;
 					StartSimplexAlgorithm = false;
 				}
@@ -1065,10 +1141,14 @@ int main() {
 				ArtificialBasisSteps.clear();
 				ArtificialBasisSteps.push_back(FirstStep);
 				SimplexAlgorithmSteps.clear();
+				ExplicitBasisSteps.clear();
 				StartSimplexAlgorithm = false;
 			}
 
 			ImGui::BeginTabBar("Solutions");
+
+			// SimplexAlgorithmTabFlags
+			ImGuiTabItemFlags SimplexAlgorithmTabFlags = ImGuiTabItemFlags_None;
 
 			// Artificial Basis Step
 			if (IsArtificialBasis) {
@@ -1127,55 +1207,71 @@ int main() {
 					} else {
 						ArtificialBasis<FractionalMatrix, Fraction>(step);
 					}
-//					ImGui::EndChild();
+					//					ImGui::EndChild();
 					ImGui::EndTabItem();
 				}
 			} else {
-				// Explicit Basis Steps
-				// TODO: Make explicit basis steps for rational coefficients
-				if (SimplexAlgorithmSteps.size() == 0) {
-					step.StepID = 0;
-					step.RealMatrix = RealMatrix;
-					step.FracMatrix = FracMatrix;
-					step.IsAutomatic = IsAutomatic;
-					step.IsCompleted = false;
-					step.IsArtificialStep = false;
-					// TODO: Add input checks
-					// [] Check if input vector doesn't lead to degenerate matrix
-					// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
-					//		or drop this method and use artificial basis instead
-					// First check if number of non-zero elements in the explicit vector less or equal then a number of limitations
-					int AmountOfNonZeroElements = 0;
-					for (float el : RealExplicitBasis) {
-						if (fabs(el) > EPSILON) {
-							AmountOfNonZeroElements += 1;
+				// Explicit basis tab
+				if (ImGui::BeginTabItem(u8"Решение для заданного базиса")) {
+					// Explicit Basis Steps
+					if (ExplicitBasisSteps.size() == 0) {
+						step.StepID = 0;
+						step.RealMatrix = RealMatrix;
+						step.FracMatrix = FracMatrix;
+						step.IsAutomatic = IsAutomatic;
+						step.IsCompleted = false;
+						step.IsArtificialStep = false;
+						// TODO: Add input checks
+						// [] Check if input vector doesn't lead to degenerate matrix
+						// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
+						//		or drop this method and use artificial basis instead
+						// First check if number of non-zero elements in the explicit vector less or equal then a number of limitations
+						int AmountOfNonZeroElements = 0;
+						for (float el : RealExplicitBasis) {
+							if (fabs(el) > EPSILON) {
+								AmountOfNonZeroElements += 1;
+							}
 						}
+
+						if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
+							printf("\nNumber of non-zero elements greater then number of limitations\n");
+							assert(0);
+						}
+
+						if (IsFractionalCoefficients) {
+							// Fractional case
+							FractionalMatrix matrix = step.FracMatrix;
+							step = ExplicitBasis(step, matrix, FractionalExplicitBasis, FractionalTargetFunction);
+							step.FracMatrix = matrix;
+						} else {
+							// Real case
+							Matrix matrix = step.RealMatrix;
+							step = ExplicitBasis(step, matrix, RealExplicitBasis, RealTargetFunction);
+							step.RealMatrix = matrix;
+						}
+						step.IsCompleted = true;
+
+						ExplicitBasisSteps.push_back(step);
 					}
 
-					if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
-						printf("\nNumber of non-zero elements greater then number of limitations\n");
-						assert(0);
-					}
-
-					step = ExplicitBasis(step, RealExplicitBasis, RealTargetFunction);
-					step.IsCompleted = true;
-					//ExplicitBasisSteps.push_back(step);
+					ImGui::PushID("Explicit Basis Displaying");
 					GUILayer::DisplaySteps(ExplicitBasisSteps, 0, IsFractionalCoefficients);
-				}
-
-				if (SimplexAlgorithmSteps.size() != 0) {
-					//DisplaySteps(ExplicitBasisSteps, 0);
+					if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
+						StartSimplexAlgorithm = true;
+						SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
+					}
+					ImGui::PopID();
+					ImGui::EndTabItem();
 				}
 			}
 
 
 			// Sholution has been found
-			ImGuiTabItemFlags SimplexAlgorithmTabFlags = ImGuiTabItemFlags_None;
 			if (step.IsCompleted && step.IsArtificialStep) {
 				ImGui::BeginChild("Solution", ImVec2(0, 0), true);
 				ImGui::Text(u8"Ответ");
 				ImGui::Separator();
-				
+
 				// Display solution
 				if (IsFractionalCoefficients) {
 					// Fractional case
@@ -1196,12 +1292,27 @@ int main() {
 			if (StartSimplexAlgorithm) {
 				ImGui::SetNextWindowFocus();
 				if (ImGui::BeginTabItem(u8"Симплекс алгоритм", &StartSimplexAlgorithm, SimplexAlgorithmTabFlags)) {
+					// Simplex algorithm's tab has been closed
+					if (StartSimplexAlgorithm == false) {
+						SimplexAlgorithmSteps.clear();
+					}
+
 					if (SimplexAlgorithmSteps.size() == 0) {
 						if (IsArtificialBasis) {
 							size_t LastElementIndex = ArtificialBasisSteps.size() - 1;
 							step.RealMatrix = ArtificialBasisSteps[LastElementIndex].RealMatrix;
 							step.FracMatrix = ArtificialBasisSteps[LastElementIndex].FracMatrix;
 							step.NumbersOfVariables = ArtificialBasisSteps[LastElementIndex].NumbersOfVariables;
+							if (IsFractionalCoefficients) {
+								MakeSimplexAlgorithmFunctionCoefficients(step, FractionalTargetFunction);
+							} else {
+								MakeSimplexAlgorithmFunctionCoefficients(step, RealTargetFunction);
+							}
+						} else {
+							size_t LastElementIndex = ExplicitBasisSteps.size() - 1;
+							step.RealMatrix = ExplicitBasisSteps[LastElementIndex].RealMatrix;
+							step.FracMatrix = ExplicitBasisSteps[LastElementIndex].FracMatrix;
+							step.NumbersOfVariables = ExplicitBasisSteps[LastElementIndex].NumbersOfVariables;
 							if (IsFractionalCoefficients) {
 								MakeSimplexAlgorithmFunctionCoefficients(step, FractionalTargetFunction);
 							} else {
@@ -1219,12 +1330,14 @@ int main() {
 						size_t LastSimplexAlgorithmElementIndex = SimplexAlgorithmSteps.size() - 1;
 						step = SimplexAlgorithmSteps[LastSimplexAlgorithmElementIndex];
 					}
+					ImGui::PushID("FUKASJD;FLJASL;DFJASDF");
 					GUILayer::DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
 					if (IsFractionalCoefficients) {
 						SimplexAlgorithm<FractionalMatrix, Fraction>(step);
 					} else {
 						SimplexAlgorithm<Matrix, float>(step);
 					}
+					ImGui::PopID();
 
 					// Display Solution
 					if (IsFractionalCoefficients) {

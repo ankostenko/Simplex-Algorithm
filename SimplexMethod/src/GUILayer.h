@@ -67,10 +67,10 @@ template<typename VectorType, typename Proc> void InputVector(std::vector<Vector
 		// Depeding on type of vector's element we decide how to handle input
 		if constexpr (std::is_same<VectorType, float>::value) {
 			// Real case
-			ImGui::InputScalar("", ImGuiDataType_Float, &Vector.at(i));
+			ImGui::InputScalar("", ImGuiDataType_Float, &Vector[i]);
 		} else {
 			// Fractional case
-			Vector.at(i) = FractionInput(Vector.at(i));
+			Vector.at(i) = FractionInput(Vector[i]);
 		}
 
 		if (i < Size - 1) { ImGui::SameLine(); }
@@ -191,6 +191,8 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 	ImGui::Text((std::string("#") + std::to_string(StepID)).c_str());
 	ImGui::NextColumn();
 
+	// Display free variables
+	// Only suitable for simplex algorithm's steps
 	for (int i = 0; i < matrix.ColNumber - 1; i++) {
 		ImGui::Text((std::string("x") + std::to_string(NumbersOfVariables[(matrix.RowNumber - 1) + i])).c_str());
 		ImGui::NextColumn();
@@ -232,21 +234,28 @@ template<typename MatrixType> void DisplayStepOnScreen(MatrixType& matrix, int S
 			if (state == CONTINUE) {
 				float width = ImGui::GetColumnWidth();
 				
+				printf("CURRENT LEAD POS: %d-%d\n", CurrentLeadPos.Row, CurrentLeadPos.Column);
 				for (RowAndColumn ElementRC : PotentialLeads) {
 					if (ElementRC.Row == i && ElementRC.Column == j && IsLastIteration) {
-						ImGui::PushID(i + j * matrix.ColNumber);
+						ImGui::PushID(j + i * matrix.ColNumber);
 						if ((ElementRC.Row == CurrentLeadPos.Row && ElementRC.Column == CurrentLeadPos.Column)) {
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.59f, 0.98f, 1.0f));
+							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4((float)249 / 255, (float)105 / 255, (float)14 / 255, 1.0f));
+							ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4((float)249 / 255, (float)105 / 255, (float)14 / 255, 1.0f));
+							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4((float)211 / 255, (float)84 / 255, (float)0 / 255, 1.0f));
 							if (ImGui::Button(CellLabel.c_str(), ImVec2(width - 15.0f, ImGui::GetTextLineHeight() * 1.3f))) {
 								CurrentLeadPos = ElementRC;
+								printf("Active: %d-%d\n", CurrentLeadPos.Row, CurrentLeadPos.Column);
 							}
-							ImGui::PopStyleColor();
+							ImGui::PopStyleColor(); ImGui::PopStyleColor(); ImGui::PopStyleColor();
 						} else {
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.59f, 0.98f, 0.40f));
+							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4((float)249 / 255, (float)191 / 255, (float)59 / 255, 1.0f));
+							ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4((float)249 / 255, (float)105 / 255, (float)14 / 255, 1.0f));
+							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4((float)211 / 255, (float)84 / 255, (float)0 / 255, 1.0f));
 							if (ImGui::Button(CellLabel.c_str(), ImVec2(width - 15.0f, ImGui::GetTextLineHeight() * 1.3f))) {
 								CurrentLeadPos = ElementRC;
+								printf("Unactive: %d-%d\n", CurrentLeadPos.Row, CurrentLeadPos.Column);
 							}
-							ImGui::PopStyleColor();
+							ImGui::PopStyleColor(); ImGui::PopStyleColor(); ImGui::PopStyleColor();
 						}
 						ImGui::PopID();
 

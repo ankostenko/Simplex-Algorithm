@@ -96,6 +96,18 @@ struct Fraction {
 		return LLNumerator <= LLOtherNumerator;
 	}
 
+	bool operator>=(Fraction other) {
+		long long LLNumerator = numerator;
+		long long LLOtherNumerator = other.numerator;
+
+		if (denominator != other.denominator) {
+			LLNumerator *= other.denominator;
+			LLOtherNumerator *= denominator;
+		}
+
+		return LLNumerator >= LLOtherNumerator;
+	}
+
 	bool operator==(Fraction other) {
 		// Making sure values that are equal to zero reliably compared. It is purely a safety check
 		if (numerator == 0 && other.numerator == 0) {
@@ -221,6 +233,14 @@ struct Fraction {
 		return *this;
 	}
 };
+
+template<typename Type> Type Genfabs(Type value) {
+	if constexpr (IS_SAME_TYPE(Type, float)) {
+		return fabs(value);
+	} else {
+		return Fraction(fabs(value.numerator), value.denominator);
+	}
+}
 
 struct FractionalMatrix {
 	Fraction* matrix = NULL;
