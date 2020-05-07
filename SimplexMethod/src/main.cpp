@@ -30,6 +30,7 @@
 #include <type_traits>
 #include <algorithm>
 
+#include "portable-file-dialogs.h"
 #include "Common.h"
 #include "GUILayer.h"
 
@@ -113,6 +114,10 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 	int CurrentRowIndex = -1;
 	ElementType CurrentLead;
 
+	if (step.IsCompleted) {
+		return step;
+	}
+
 	// Choose matrix based on input
 	MatrixType matrix;
 	if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
@@ -173,7 +178,7 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 						IsRowBannedToSwap = true;
 					}
 				}
-				if (IsRowBannedToSwap) { continue; }
+				//if (IsRowBannedToSwap) { continue; }
 			}
 
 			for (int j = 0; j < matrix.ColNumber - 1; j++) {
@@ -195,7 +200,7 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 						IsRowBannedToSwap = true;
 					}
 				}
-				if (IsRowBannedToSwap) { continue; }
+				//if (IsRowBannedToSwap) { continue; }
 			}
 
 			if (matrix[i][CurrentColumnIndex] > ZeroElement) {
@@ -439,6 +444,7 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 		step.IsCompleted = true;
 	} else if (state == SOLUTION_DOESNT_EXIST) {
 		step.IsCompleted = true;
+		ArtificialBasisSteps.push_back(step);
 	}
 
 	// Choose lead element
@@ -511,9 +517,9 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 					}
 
 					// Multiple Minimums
-					if (!IsRowBanned) {
-						GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
-					}
+					//if (!IsRowBanned) {
+					GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
+					//}
 				}
 			}
 		}
@@ -553,11 +559,20 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 
 			// Change order of variables in the array of variables
 			std::swap(NewStep.NumbersOfVariables[NewStep.StepChosenRC.Row], NewStep.NumbersOfVariables[(RowNumber - 1) + NewStep.StepChosenRC.Column]);
-			NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (RowNumber - 1) + NewStep.StepChosenRC.Column);
-			if constexpr (IS_SAME_TYPE(ElementType, float)) {
-				NewStep.RealMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
-			} else {
-				NewStep.FracMatrix.DeleteColumn(NewStep.StepChosenRC.Column);
+			for (int i = RowNumber - 1; i < NewStep.NumbersOfVariables.size(); i++) {
+				if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
+					if (NewStep.NumbersOfVariables[i] > ArtificialBasisSteps[1].RealMatrix.ColNumber - 1) {
+						NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + i);
+						NewStep.RealMatrix.DeleteColumn(i - (RowNumber - 1));
+						break;
+					}
+				} else {
+					if (NewStep.NumbersOfVariables[i] > NewStep.FracMatrix.ColNumber - 1) {
+						NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (RowNumber - 1) + i);
+						NewStep.FracMatrix.DeleteColumn(i);
+						i -= 2;
+					}
+				}
 			}
 
 			// Disables "confirm" button
@@ -949,6 +964,49 @@ int main() {
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
+
+		// Main menu bar
+		// --------------------------------------------
+		static bool OpenAboutPopup = false;
+		if (ImGui::BeginMainMenuBar()) {
+			if (ImGui::BeginMenu(u8"Файл")) {
+				if (ImGui::MenuItem(u8"Открыть...", "CTRL+O")) {
+					printf("Open menu clicked\n");
+				}
+				if (ImGui::MenuItem(u8"Сохранить", "CTRL+S")) {
+					printf("Save menu clicked\n");
+				}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu(u8"Справка")) {
+				if (ImGui::MenuItem(u8"О программе")) {
+					OpenAboutPopup = true;
+				}
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMainMenuBar();
+		}
+		if (OpenAboutPopup) { ImGui::OpenPopup(u8"О программе"); }
+
+		ImGui::SetNextWindowSize(ImVec2(ImGui::GetWindowSize().x * 0.7f, 160.0f));
+		if (ImGui::BeginPopupModal(u8"О программе", 0, ImGuiWindowFlags_NoResize)) {
+			ImGui::BeginChild("About", ImVec2(0, 0), true);
+			ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - ImGui::GetFontSize() * 3.8f);
+			ImGui::Text(u8"Симплекс алгоритм");
+			ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - ImGui::GetFontSize() * 5);
+			ImGui::Text(u8"Костенко Андрей, ИВТ-31БО");
+			ImGui::NewLine();
+			ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - 30.0f);
+			if (ImGui::Button("OK", ImVec2(60.0f, 25.0f))) {
+				OpenAboutPopup = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndChild();
+			ImGui::EndPopup();
+		}
+		// --------------------------------------------
 
 		// Docking 
 		// --------------------------------------------
@@ -1342,18 +1400,41 @@ int main() {
 				ImGui::Text(u8"Ответ");
 				ImGui::Separator();
 
-				// Display solution
+				// Display Solution
 				if (IsFractionalCoefficients) {
-					// Fractional case
-					GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, false);
+					AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, step.IsArtificialStep);
+					if (state != CONTINUE) {
+
+						assert(state != UNDEFINED);
+
+						if (state == UNLIMITED_SOLUTION) {
+							ImGui::TextColored(ImColor(255, 0, 0), u8"Решение неограничено!");
+						} else if (state == SOLUTION_DOESNT_EXIST) {
+							ImGui::TextColored(ImColor(255, 0, 0), u8"Решения не существует!");
+						} else if (state == COMPLETED) {
+							// Fractional case
+							GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, false);
+						}
+					}
 				} else {
-					// Real case
-					GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, false);
+					AlgorithmState state = CheckAlgorithmState(step.RealMatrix, false, step.IsArtificialStep);
+					if (state != CONTINUE) {
+						assert(state != UNDEFINED);
+
+						if (state == UNLIMITED_SOLUTION) {
+							ImGui::TextColored(ImColor(255, 0, 0), u8"Решение неограничено!");
+						} else if (state == SOLUTION_DOESNT_EXIST) {
+							ImGui::TextColored(ImColor(255, 0, 0), u8"Решения не существует!");
+						} else if (state == COMPLETED) {
+							// Real case
+							GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, false);
+						}
+					}
 				}
 
 				ImGui::EndChild();
 
-				if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
+				if (!step.IsCompleted && ImGui::Button(u8"Продолжить симплекс алгоритм")) {
 					StartSimplexAlgorithm = true;
 					SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
 				}

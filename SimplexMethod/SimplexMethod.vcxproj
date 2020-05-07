@@ -170,6 +170,7 @@
     <ClInclude Include="external\imgui\imstb_textedit.h" />
     <ClInclude Include="external\imgui\imstb_truetype.h" />
     <ClInclude Include="external\KHR\khrplatform.h" />
+    <ClInclude Include="external\portable-file-dialogs.h" />
     <ClInclude Include="src\Common.h" />
     <ClInclude Include="src\GUILayer.h" />
   </ItemGroup>
