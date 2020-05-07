@@ -303,11 +303,38 @@ void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoef
 	}
 }
 
+bool ErrorWindow(const char *ErrorMessage) {
+	ImGui::OpenPopup(u8"Ошибка");
+
+	if (ImGui::BeginPopupModal(u8"Ошибка", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - ImGui::CalcTextSize(ErrorMessage).x / 2);
+		ImGui::Text(ErrorMessage);
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - 30.0f);
+		if (ImGui::Button(u8"ОК", ImVec2(60, 30))) { 
+			ImGui::CloseCurrentPopup(); 
+			ImGui::EndPopup();
+			return true;
+		}
+		ImGui::EndPopup();
+	}
+
+	return false;
+}
 
 void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumberOfVariables, int &OutNumberOfLimitations, bool &IsReadHasHappened, int &IsFractionalCoeffs) {
 	static bool OpenAboutPopup = false;
 	static bool OpenFileOpenPopup = false;
 	static int IsFractionalCoefficients = 0;
+	static bool ErrorOccured = false;
+	const static char* ErrorMessage;
+
+	if (ErrorOccured) {
+		// If window is closed
+		if (ErrorWindow(ErrorMessage)) {
+			ErrorOccured = false;
+		}
+	}
+
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu(u8"Файл")) {
 			if (ImGui::MenuItem(u8"Открыть...")) {
@@ -362,7 +389,10 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 			static WCHAR DEFAULT_PATH[256];
 			GetModuleFileName(NULL, DEFAULT_PATH, 256);
 			auto path = pfd::open_file(u8"Открыть файл", (char*)DEFAULT_PATH, { u8"Текстовые файлы", "*.txt *.text" });
-			std::string filename(path.result()[0]);
+			std::string filename;
+			if (!path.result().empty()) {
+				filename = path.result()[0];
+			}
 
 			if (!filename.empty()) {
 				IsReadHasHappened = true;
@@ -374,32 +404,45 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 				int NumberOfLimitations = -1;
 				int NumberOfVariables = -1;
-				fscanf(file, "%d", &NumberOfVariables);
-				fscanf(file, "%d", &NumberOfLimitations);
-
-				if (NumberOfLimitations == -1 || NumberOfVariables == -1) {
-					printf("Cannot read matrix dimensions");
+				if (fscanf(file, "%d", &NumberOfVariables) != 1 || fscanf(file, "%d", &NumberOfLimitations) != 1) {
+					IsReadHasHappened = false;
+					ErrorOccured = true;
+					ErrorMessage = u8"Произошла ошибка при чтении размерности задачи!";
 				}
 
-				OutNumberOfLimitations = NumberOfLimitations;
-				OutNumberOfVariables   = NumberOfVariables;
+				if (NumberOfVariables < 1 || NumberOfLimitations < 1 || NumberOfLimitations >= NumberOfVariables) {
+					IsReadHasHappened = false;
+					ErrorOccured = true;
+					ErrorMessage = u8"Неверная размерность";
+				}
 
-				if (IsFractionalCoefficients) {
+				if (!ErrorOccured) {
+					OutNumberOfLimitations = NumberOfLimitations;
+					OutNumberOfVariables   = NumberOfVariables;
 					FracMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
-					for (int i = 0; i < NumberOfLimitations; i++) {
-						for (int j = 0; j < NumberOfVariables; j++) {
-							if (fscanf(file, "%d/%d", &FracMatrix[i][j].numerator, &FracMatrix[i][j].denominator) != 2) {
-								printf("Error occured while reading input is not correct");
-							}
-						}
-					}
-				} else {
 					RealMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
-					for (int i = 0; i < NumberOfLimitations; i++) {
-						for (int j = 0; j < NumberOfVariables; j++) {
-							if (fscanf(file, "%f", &RealMatrix[i][j]) != 1) {
-								printf("Error occured while reading input is not correct");
+
+					if (IsFractionalCoefficients) {
+						for (int i = 0; i < NumberOfLimitations; i++) {
+							for (int j = 0; j < NumberOfVariables; j++) {
+								if (fscanf(file, "%d/%d", &FracMatrix[i][j].numerator, &FracMatrix[i][j].denominator) != 2) {
+									IsReadHasHappened = false;
+									ErrorOccured = true;
+									ErrorMessage = u8"Произошла ошибка при чтении матрицы ограничений!";
+								}
 							}
+							if (ErrorOccured) { break; }
+						}
+					} else {
+						for (int i = 0; i < NumberOfLimitations; i++) {
+							for (int j = 0; j < NumberOfVariables; j++) {
+								if (fscanf(file, "%f", &RealMatrix[i][j]) != 1) {
+									IsReadHasHappened = false;
+									ErrorOccured = true;
+									ErrorMessage = u8"Произошла ошибка при чтении матрицы ограничений!";
+								}
+							}
+							if (ErrorOccured) { break; }
 						}
 					}
 				}
