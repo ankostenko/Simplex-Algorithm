@@ -442,7 +442,6 @@ struct Step {
 	bool IsAutomatic;
 	bool IsWaitingForInput;
 	bool IsCompleted;
-	std::vector<int> RowsBannedToSwap;
 	Matrix RealMatrix;
 	FractionalMatrix FracMatrix;
 	// First m variables are basis variables
@@ -463,7 +462,6 @@ struct Step {
 		IsAutomatic = step.IsAutomatic;
 		IsWaitingForInput = step.IsWaitingForInput;
 		IsCompleted = step.IsCompleted;
-		RowsBannedToSwap = step.RowsBannedToSwap;
 		RealMatrix = step.RealMatrix;
 		FracMatrix = step.FracMatrix;
 		NumbersOfVariables = step.NumbersOfVariables;
@@ -479,7 +477,6 @@ struct Step {
 		IsAutomatic = step.IsAutomatic;
 		IsWaitingForInput = step.IsWaitingForInput;
 		IsCompleted = step.IsCompleted;
-		RowsBannedToSwap = step.RowsBannedToSwap;
 		RealMatrix = step.RealMatrix;
 		FracMatrix = step.FracMatrix;
 		NumbersOfVariables = step.NumbersOfVariables;

@@ -168,16 +168,6 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 
 		// Find number of column of an available element
 		for (int i = 0; i < matrix.RowNumber - 1; i++) {
-			if (step.IsArtificialStep) {
-				bool IsRowBannedToSwap = false;
-				for (auto RowNumber : step.RowsBannedToSwap) {
-					if (RowNumber == i) {
-						IsRowBannedToSwap = true;
-					}
-				}
-				//if (IsRowBannedToSwap) { continue; }
-			}
-
 			for (int j = 0; j < matrix.ColNumber - 1; j++) {
 				if (matrix[matrix.RowNumber - 1][j] < -ZeroElement) {
 					if (matrix[i][j] > ZeroElement) {
@@ -190,16 +180,6 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 
 		// Choose any available lead element
 		for (int i = 0; i < matrix.RowNumber - 1; i++) {
-			if (step.IsArtificialStep) {
-				bool IsRowBannedToSwap = false;
-				for (auto RowNumber : step.RowsBannedToSwap) {
-					if (RowNumber == i) {
-						IsRowBannedToSwap = true;
-					}
-				}
-				//if (IsRowBannedToSwap) { continue; }
-			}
-
 			if (matrix[i][CurrentColumnIndex] > ZeroElement) {
 				if (matrix[i][matrix.ColNumber - 1] / matrix[i][CurrentColumnIndex] < ColumnMinimum) {
 					CurrentLead = matrix[i][CurrentColumnIndex];
@@ -268,7 +248,6 @@ template<typename MatrixType, typename ElementType> Step SimplexStep(Step step) 
 	NewStep.StepID += 1;
 	NewStep.StepChosenRC.Row = CurrentRowIndex;
 	NewStep.StepChosenRC.Column = CurrentColumnIndex;
-	NewStep.RowsBannedToSwap.push_back(CurrentRowIndex);
 	return NewStep;
 }
 
@@ -555,10 +534,10 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 						break;
 					}
 				} else {
-					if (NewStep.NumbersOfVariables[i] > NewStep.FracMatrix.ColNumber - 1) {
-						NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + (RowNumber - 1) + i);
-						NewStep.FracMatrix.DeleteColumn(i);
-						i -= 2;
+					if (NewStep.NumbersOfVariables[i] > ArtificialBasisSteps[1].FracMatrix.ColNumber - 1) {
+						NewStep.NumbersOfVariables.erase(NewStep.NumbersOfVariables.begin() + i);
+						NewStep.FracMatrix.DeleteColumn(i - (RowNumber - 1));
+						break;
 					}
 				}
 			}
@@ -948,47 +927,20 @@ int main() {
 		ImGui::NewFrame();
 
 		// Main menu bar
-		// --------------------------------------------
-		static bool OpenAboutPopup = false;
-		if (ImGui::BeginMainMenuBar()) {
-			if (ImGui::BeginMenu(u8"Файл")) {
-				if (ImGui::MenuItem(u8"Открыть...", "CTRL+O")) {
-					printf("Open menu clicked\n");
-				}
-				if (ImGui::MenuItem(u8"Сохранить", "CTRL+S")) {
-					printf("Save menu clicked\n");
-				}
-				ImGui::EndMenu();
-			}
+		bool IsReadHasHappened = false;
+		GUILayer::MainMenuBar(RealMatrix, FracMatrix, NumberOfVariables, NumberOfLimitations, IsReadHasHappened, IsFractionalCoefficients);
 
-			if (ImGui::BeginMenu(u8"Справка")) {
-				if (ImGui::MenuItem(u8"О программе")) {
-					OpenAboutPopup = true;
-				}
-				ImGui::EndMenu();
-			}
+		// If we read data from a file we fast forward all configuration steps
+		if (IsReadHasHappened) {
+			UnconfirmedIsFractionalCoefficients = IsFractionalCoefficients;
+			SizeConfirmedReadyToContinue = true;
+			ContinueToProblemInput = true;
+			RealTargetFunction.resize(NumberOfVariables);
+			RealExplicitBasis.resize(NumberOfVariables - 1);
 
-			ImGui::EndMainMenuBar();
+			FractionalTargetFunction.resize(NumberOfVariables);
+			FractionalExplicitBasis.resize(NumberOfVariables - 1);
 		}
-		if (OpenAboutPopup) { ImGui::OpenPopup(u8"О программе"); }
-
-		ImGui::SetNextWindowSize(ImVec2(ImGui::GetWindowSize().x * 0.7f, 160.0f));
-		if (ImGui::BeginPopupModal(u8"О программе", 0, ImGuiWindowFlags_NoResize)) {
-			ImGui::BeginChild("About", ImVec2(0, 0), true);
-			ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - ImGui::GetFontSize() * 3.8f);
-			ImGui::Text(u8"Симплекс алгоритм");
-			ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - ImGui::GetFontSize() * 5);
-			ImGui::Text(u8"Костенко Андрей, ИВТ-31БО");
-			ImGui::NewLine();
-			ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - 30.0f);
-			if (ImGui::Button("OK", ImVec2(60.0f, 25.0f))) {
-				OpenAboutPopup = false;
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndChild();
-			ImGui::EndPopup();
-		}
-		// --------------------------------------------
 
 		// Docking 
 		// --------------------------------------------
@@ -1035,9 +987,9 @@ int main() {
 		ImGui::Separator();
 
 		// Choose number of variables
-		NumberOfVariables = GUILayer::ComboBox(GUILayer::ComboBoxVariablesLabel);
+		NumberOfVariables = GUILayer::ComboBox(GUILayer::ComboBoxVariablesLabel, NumberOfVariables - 2, NumberOfLimitations - 1, IsReadHasHappened);
 		// Choose number of limitations
-		NumberOfLimitations = GUILayer::ComboBox(GUILayer::ComboBoxLimitationsLabel);
+		NumberOfLimitations = GUILayer::ComboBox(GUILayer::ComboBoxLimitationsLabel, NumberOfVariables - 2, NumberOfLimitations - 1, IsReadHasHappened);
 
 		// Apply new sizes
 		if (ImGui::Button(u8"Применить")) {
@@ -1078,6 +1030,7 @@ int main() {
 				ContinueToProblemInput = true;
 				Step FirstStep = ArtificialBasisSteps[0];
 				ArtificialBasisSteps.clear();
+				FirstStep.NumbersOfVariables.resize(NumberOfVariables);
 				ArtificialBasisSteps.push_back(FirstStep);
 				SimplexAlgorithmSteps.clear();
 				ExplicitBasisSteps.clear();
@@ -1140,9 +1093,8 @@ int main() {
 			ImGui::Text(u8"Матрица ограничений");
 			ImGui::SameLine(); GUILayer::HelpMarker(u8"*Внутри этого блока переключаться между элементами можно с помощью клавиши Tab.\n*Изменить ширину столбца можно потянув за вертикальный разделитель.");
 			// Group
-			ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 140, 0.0f));
-			ImGui::BeginChild("Matrix Of Limitations", ImVec2(0, ImGui::GetFontSize() * RealMatrix.RowNumber * 2), false, ImGuiWindowFlags_HorizontalScrollbar);
-
+			ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, RealMatrix.RowNumber * 30.0f));
+			ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f > RealMatrix.RowNumber * 30.0f ? RealMatrix.RowNumber * 42.0f : ImGui::GetWindowHeight() * 0.7f), false, ImGuiWindowFlags_HorizontalScrollbar);
 			if (!IsFractionalCoefficients) {
 				GUILayer::MatrixInput(RealMatrix);
 			} else {
@@ -1150,7 +1102,6 @@ int main() {
 			}
 			ImGui::EndChild();
 			ImGui::PopID();
-
 
 			ImGui::Separator();
 
@@ -1296,7 +1247,7 @@ int main() {
 
 					// Display all steps that has been calculated
 					ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
-					ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f), true, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+					ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f), true, ImGuiWindowFlags_HorizontalScrollbar);
 					GUILayer::DisplaySteps(ArtificialBasisSteps, 1, IsFractionalCoefficients);
 					if (!IsFractionalCoefficients) {
 						ArtificialBasis<Matrix, float>(step);
@@ -1378,7 +1329,7 @@ int main() {
 			// Sholution has been found
 			if (step.IsCompleted && step.IsArtificialStep) {
 				ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
-				ImGui::BeginChild("Solution", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, 130.0f), true, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+				ImGui::BeginChild("Solution", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, 130.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
 				ImGui::Text(u8"Ответ");
 				ImGui::Separator();
 
@@ -1416,7 +1367,7 @@ int main() {
 
 				ImGui::EndChild();
 
-				if (!step.IsCompleted && ImGui::Button(u8"Продолжить симплекс алгоритм")) {
+				if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
 					StartSimplexAlgorithm = true;
 					SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
 				}
@@ -1467,7 +1418,7 @@ int main() {
 					}
 					ImGui::PushID("Simplex Algorithm");
 					ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + RealMatrix.ColNumber * 170, 0.0f));
-					ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f), true, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+					ImGui::BeginChild("Matrix Of Limitations", ImVec2(ImGui::GetWindowWidth() - ImGui::GetCursorPos().x - 25.0f, ImGui::GetWindowHeight() * 0.7f), true, ImGuiWindowFlags_HorizontalScrollbar);
 					GUILayer::DisplaySteps(SimplexAlgorithmSteps, 0, IsFractionalCoefficients);
 					if (IsFractionalCoefficients) {
 						SimplexAlgorithm<FractionalMatrix, Fraction>(step);

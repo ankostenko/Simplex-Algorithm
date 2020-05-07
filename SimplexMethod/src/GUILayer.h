@@ -16,7 +16,7 @@ static void HelpMarker(const char* desc) {
 	}
 }
 
-int ComboBox(const char *label) {
+int ComboBox(const char *label, int FileVariables, int FileLimitations, bool FileReadHasHappened) {
 	const char* values[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16" };
 	static int CallNumber = 0;
 	CallNumber = CallNumber == 0 ? 1 : 0;
@@ -27,11 +27,13 @@ int ComboBox(const char *label) {
 
 	static int CallOneCurrentItem = 0;
 	static int CallTwoCurrentItem = 0;
-	
+
 	static int *CurrentItem = NULL;
 	if (CallNumber == 0) {
+		if (FileReadHasHappened) { CallOneCurrentItem = FileLimitations; }
 		CurrentItem = &CallOneCurrentItem;
 	} else {
+		if (FileReadHasHappened) { CallTwoCurrentItem = FileVariables; }
 		CurrentItem = &CallTwoCurrentItem;
 	}
 	
@@ -299,6 +301,118 @@ void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoef
 			ImGui::Separator();
 		}
 	}
+}
+
+
+void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumberOfVariables, int &OutNumberOfLimitations, bool &IsReadHasHappened, int &IsFractionalCoeffs) {
+	static bool OpenAboutPopup = false;
+	static bool OpenFileOpenPopup = false;
+	static int IsFractionalCoefficients = 0;
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu(u8"Файл")) {
+			if (ImGui::MenuItem(u8"Открыть...")) {
+				OpenFileOpenPopup = true;
+			}
+			if (ImGui::MenuItem(u8"Сохранить")) {
+				printf("Save menu clicked\n");
+			}
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu(u8"Справка")) {
+			if (ImGui::MenuItem(u8"О программе")) {
+				OpenAboutPopup = true;
+			}
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMainMenuBar();
+	}
+	if (OpenAboutPopup) { ImGui::OpenPopup(u8"О программе"); }
+	if (OpenFileOpenPopup) { ImGui::OpenPopup(u8"Открыть файл"); }
+
+	ImGui::SetNextWindowSize(ImVec2(ImGui::GetWindowSize().x * 0.7f, 160.0f));
+	if (ImGui::BeginPopupModal(u8"О программе", &OpenAboutPopup, ImGuiWindowFlags_NoResize)) {
+		ImGui::BeginChild("About", ImVec2(0, 0), true);
+		ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - ImGui::GetFontSize() * 3.8f);
+		ImGui::Text(u8"Симплекс алгоритм");
+		ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - ImGui::GetFontSize() * 5);
+		ImGui::Text(u8"Костенко Андрей, ИВТ-31БО");
+		ImGui::NewLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowSize().x / 2 - 30.0f);
+		if (ImGui::Button("OK", ImVec2(60.0f, 25.0f))) {
+			OpenAboutPopup = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
+
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(240, 240, 240, 255));
+	if (ImGui::BeginPopupModal(u8"Открыть файл", &OpenFileOpenPopup, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::BeginChild("OpenFile", ImVec2(400, 140), true);
+		ImGui::Text(u8"Выберите тип элементов");
+		ImGui::Separator();
+		ImGui::PushID(1);
+		ImGui::Combo("", &IsFractionalCoefficients, u8"Действительные числа\0Обыкновенные дроби\0");
+		ImGui::PopID();
+
+		ImGui::EndChild();
+		if (ImGui::Button(u8"Применить")) {
+			static WCHAR DEFAULT_PATH[256];
+			GetModuleFileName(NULL, DEFAULT_PATH, 256);
+			auto path = pfd::open_file(u8"Открыть файл", (char*)DEFAULT_PATH, { u8"Текстовые файлы", "*.txt *.text" });
+			std::string filename(path.result()[0]);
+
+			if (!filename.empty()) {
+				IsReadHasHappened = true;
+				IsFractionalCoeffs = IsFractionalCoefficients;
+
+				FILE* file = fopen(filename.c_str(), "r");
+				// If it asserts something went horribly wrong
+				assert(file);
+
+				int NumberOfLimitations = -1;
+				int NumberOfVariables = -1;
+				fscanf(file, "%d", &NumberOfVariables);
+				fscanf(file, "%d", &NumberOfLimitations);
+
+				if (NumberOfLimitations == -1 || NumberOfVariables == -1) {
+					printf("Cannot read matrix dimensions");
+				}
+
+				OutNumberOfLimitations = NumberOfLimitations;
+				OutNumberOfVariables   = NumberOfVariables;
+
+				if (IsFractionalCoefficients) {
+					FracMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
+					for (int i = 0; i < NumberOfLimitations; i++) {
+						for (int j = 0; j < NumberOfVariables; j++) {
+							if (fscanf(file, "%d/%d", &FracMatrix[i][j].numerator, &FracMatrix[i][j].denominator) != 2) {
+								printf("Error occured while reading input is not correct");
+							}
+						}
+					}
+				} else {
+					RealMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
+					for (int i = 0; i < NumberOfLimitations; i++) {
+						for (int j = 0; j < NumberOfVariables; j++) {
+							if (fscanf(file, "%f", &RealMatrix[i][j]) != 1) {
+								printf("Error occured while reading input is not correct");
+							}
+						}
+					}
+				}
+
+				fclose(file);
+			}
+			
+			OpenFileOpenPopup = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	ImGui::PopStyleColor();
 }
 
 }
