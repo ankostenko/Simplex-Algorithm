@@ -1,10 +1,10 @@
 /*
-		[] Работа с обыкновенными и десятичными дробями.
+		[x] Работа с обыкновенными и десятичными дробями.
 		[] Контроль данных (защита от «дурака»)
 		[] [Сохранение введённой задачи в файл] и чтение из файла.
 		[] В пошаговом режиме возможность возврата назад.
 		[] Справка.
-		[] Контекстно-зависимая помощь.
+		[x] Контекстно-зависимая помощь.
 		[x] Возможность решения задачи с использованием заданных базисных переменных.
 		[x] Возможность диалогового ввода размерности задачи и матрицы коэффициентов целевой функции в канонической форме. Размерность не более 16*16.
 		[x] Реализация метода искусственного базиса.
@@ -12,9 +12,6 @@
 		[x] В пошаговом режиме возможность выбора опорного элемента.
 		[x] Поддержка мыши.
 */
-
-// BUG: Program doesn't show anything if there's no any negative elements in columns and result is negative. (Should show doesn't have solutions(?))
-
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -509,17 +506,8 @@ template<typename MatrixType, typename ElementType> void ArtificialBasis(Step st
 				}
 
 				for (std::pair<ElementType, int> MR : MinimumAndRowIndex) {
-					bool IsRowBanned = false;
-					for (auto row : step.RowsBannedToSwap) {
-						if (row == MR.second) {
-							IsRowBanned = true;
-						}
-					}
-
 					// Multiple Minimums
-					//if (!IsRowBanned) {
 					GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
-					//}
 				}
 			}
 		}
@@ -698,12 +686,6 @@ template<typename MatrixType, typename ElementType> void SimplexAlgorithm(Step s
 				}
 
 				for (std::pair<ElementType, int> MR : MinimumAndRowIndex) {
-					bool IsRowBanned = false;
-					for (auto row : step.RowsBannedToSwap) {
-						if (row == MR.second) {
-							IsRowBanned = true;
-						}
-					}
 					GUILayer::PotentialLeads.push_back(RowAndColumn({ MR.second, i }));
 
 				}
