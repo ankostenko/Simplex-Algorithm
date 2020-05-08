@@ -81,7 +81,7 @@
     <ClInclude Include="external\imgui\imgui_impl_opengl3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="external\portable-file-dialogs.h">
+    <ClInclude Include="external\tinyfiledialogs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -150,6 +150,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="external\imgui\imgui_impl_opengl3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="external\tinyfiledialogs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

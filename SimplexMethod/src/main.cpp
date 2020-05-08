@@ -1,7 +1,7 @@
 /*
 		[x] Работа с обыкновенными и десятичными дробями.
 		[] Контроль данных (защита от «дурака»)
-		[] [Сохранение введённой задачи в файл] и чтение из файла.
+		[x] [Сохранение введённой задачи в файл] и чтение из файла.
 		[] В пошаговом режиме возможность возврата назад.
 		[] Справка.
 		[x] Контекстно-зависимая помощь.
@@ -26,8 +26,11 @@
 #include <string>
 #include <type_traits>
 #include <algorithm>
+#include <regex>
 
-#include "portable-file-dialogs.h"
+#define WIN32_LEAN_AND_MEAN
+#include "windows.h" // For GetModuleFilename
+#include "tinyfiledialogs.h"
 #include "Common.h"
 #include "GUILayer.h"
 

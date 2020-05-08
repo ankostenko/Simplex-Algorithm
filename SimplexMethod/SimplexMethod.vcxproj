@@ -174,7 +174,7 @@
     <ClInclude Include="external\imgui\imstb_textedit.h" />
     <ClInclude Include="external\imgui\imstb_truetype.h" />
     <ClInclude Include="external\KHR\khrplatform.h" />
-    <ClInclude Include="external\portable-file-dialogs.h" />
+    <ClInclude Include="external\tinyfiledialogs.h" />
     <ClInclude Include="src\Common.h" />
     <ClInclude Include="src\GUILayer.h" />
   </ItemGroup>
@@ -200,6 +200,7 @@
     <ClCompile Include="external\imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="external\imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="external\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="external\tinyfiledialogs.c" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

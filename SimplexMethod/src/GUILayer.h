@@ -322,8 +322,19 @@ bool ErrorWindow(const char *ErrorMessage) {
 }
 
 void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumberOfVariables, int &OutNumberOfLimitations, bool &IsReadHasHappened, int &IsFractionalCoeffs) {
+	// Default path initialization
+	static WCHAR DEFAULT_PATH[256];
+	GetModuleFileName(NULL, (WCHAR*)DEFAULT_PATH, 256);
+	static std::regex target(u8"SimplexMethod.exe");
+	static std::wstring STR_DEFAULT_PATH(DEFAULT_PATH);
+	static std::string StrDEFULAT_PATH = std::regex_replace(std::string(STR_DEFAULT_PATH.begin(), STR_DEFAULT_PATH.end()), target, " ");
+	// Patterns
+	char const* lFilterPatterns[2] = { "*.txt", "*.text" };
+	
+	
 	static bool OpenAboutPopup = false;
 	static bool OpenFileOpenPopup = false;
+	static bool OpenFileSavePopup = false;
 	static int IsFractionalCoefficients = 0;
 	static bool ErrorOccured = false;
 	const static char* ErrorMessage;
@@ -341,7 +352,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 				OpenFileOpenPopup = true;
 			}
 			if (ImGui::MenuItem(u8"Сохранить")) {
-				printf("Save menu clicked\n");
+				OpenFileSavePopup = true;
 			}
 			ImGui::EndMenu();
 		}
@@ -357,6 +368,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 	}
 	if (OpenAboutPopup) { ImGui::OpenPopup(u8"О программе"); }
 	if (OpenFileOpenPopup) { ImGui::OpenPopup(u8"Открыть файл"); }
+	if (OpenFileSavePopup) { ImGui::OpenPopup(u8"Сохранить файл"); }
 
 	ImGui::SetNextWindowSize(ImVec2(ImGui::GetWindowSize().x * 0.7f, 160.0f));
 	if (ImGui::BeginPopupModal(u8"О программе", &OpenAboutPopup, ImGuiWindowFlags_NoResize)) {
@@ -377,7 +389,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 	ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(240, 240, 240, 255));
 	if (ImGui::BeginPopupModal(u8"Открыть файл", &OpenFileOpenPopup, ImGuiWindowFlags_AlwaysAutoResize)) {
-		ImGui::BeginChild("OpenFile", ImVec2(400, 140), true);
+		ImGui::BeginChild("OpenFile", ImVec2(400, 70), true);
 		ImGui::Text(u8"Выберите тип элементов");
 		ImGui::Separator();
 		ImGui::PushID(1);
@@ -386,12 +398,10 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 		ImGui::EndChild();
 		if (ImGui::Button(u8"Применить")) {
-			static WCHAR DEFAULT_PATH[256];
-			GetModuleFileName(NULL, DEFAULT_PATH, 256);
-			auto path = pfd::open_file(u8"Открыть файл", (char*)DEFAULT_PATH, { u8"Текстовые файлы", "*.txt *.text" });
+			const char *path = tinyfd_openFileDialog("Открыть файл", StrDEFULAT_PATH.c_str(), 2, lFilterPatterns, NULL, false);
 			std::string filename;
-			if (!path.result().empty()) {
-				filename = path.result()[0];
+			if (path != NULL) {
+				filename = path;
 			}
 
 			if (!filename.empty()) {
@@ -404,7 +414,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 				int NumberOfLimitations = -1;
 				int NumberOfVariables = -1;
-				if (fscanf(file, "%d", &NumberOfVariables) != 1 || fscanf(file, "%d", &NumberOfLimitations) != 1) {
+				if (fscanf(file, "%d", &NumberOfLimitations) != 1 || fscanf(file, "%d", &NumberOfVariables) != 1) {
 					IsReadHasHappened = false;
 					ErrorOccured = true;
 					ErrorMessage = u8"Произошла ошибка при чтении размерности задачи!";
@@ -451,6 +461,54 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 			}
 			
 			OpenFileOpenPopup = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	ImGui::PopStyleColor();
+
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(240, 240, 240, 255));
+	if (ImGui::BeginPopupModal(u8"Сохранить файл", &OpenFileSavePopup, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::BeginChild("SaveFile", ImVec2(400, 70), true);
+		ImGui::Text(u8"Выберите тип элементов");
+		ImGui::Separator();
+		ImGui::PushID(1);
+		ImGui::Combo("", &IsFractionalCoefficients, u8"Действительные числа\0Обыкновенные дроби\0");
+		ImGui::PopID();
+		ImGui::EndChild();
+	
+		if (ImGui::Button(u8"Применить")) {
+			const char* path = tinyfd_saveFileDialog(u8"Открыть файл", StrDEFULAT_PATH.c_str(), 2, lFilterPatterns, NULL);
+			std::string filename;
+			if (path != NULL) {
+				filename = path;
+			}
+
+			if (!filename.empty()) {
+				FILE* file = fopen(filename.c_str(), "w");
+				assert(file != NULL);
+
+				if (IsFractionalCoefficients) {
+					fprintf(file, "%d\n%d\n", FracMatrix.RowNumber - 1, FracMatrix.ColNumber);
+					for (int i = 0; i < FracMatrix.RowNumber - 1; i++) {
+						for (int j = 0; j < FracMatrix.ColNumber; j++) {
+							fprintf(file, "%d/%d ", FracMatrix[i][j].numerator, FracMatrix[i][j].denominator);
+						}
+						fprintf(file, "\n");
+					}
+				} else {
+					fprintf(file, "%d\n%d\n", RealMatrix.RowNumber - 1, RealMatrix.ColNumber);
+					for (int i = 0; i < RealMatrix.RowNumber - 1; i++) {
+						for (int j = 0; j < RealMatrix.ColNumber; j++) {
+							fprintf(file, "%f ", RealMatrix[i][j]);
+						}
+						fprintf(file, "\n");
+					}
+				}
+
+				fclose(file);
+			}
+			OpenFileSavePopup = false;
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
