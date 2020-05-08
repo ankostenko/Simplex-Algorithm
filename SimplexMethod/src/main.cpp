@@ -71,6 +71,21 @@ AlgorithmState CheckAlgorithmState(Matrix& matrix, bool IsAutomatic, bool IsArti
 		}
 	}
 
+	// Check if rows are indepenedent
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		int ZeroElementsCount = 0;
+		for (int j = 0; j < matrix.ColNumber - 1; j++) {
+			// if element is zero
+			if (fabs(matrix[i][j]) < EPSILON) {
+				ZeroElementsCount++;
+			}
+		}
+		if (ZeroElementsCount == matrix.ColNumber - 1) {
+			state = SOLUTION_DOESNT_EXIST;
+			break;
+		}
+	}
+
 	assert(state != UNDEFINED);
 	return state;
 }
@@ -104,6 +119,21 @@ AlgorithmState CheckAlgorithmState(FractionalMatrix& matrix, bool IsAutomatic, b
 			if (matrix[matrix.RowNumber - 1][matrix.ColNumber - 1] < -EPSILON) {
 				state = SOLUTION_DOESNT_EXIST;
 			}
+		}
+	}
+
+	// Check if rows are indepenedent
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		int ZeroElementsCount = 0;
+		for (int j = 0; j < matrix.ColNumber - 1; j++) {
+			// if element is zero
+			if (matrix[i][j] == Fraction(0, 1)) {
+				ZeroElementsCount++;
+			}
+		}
+		if (ZeroElementsCount == matrix.ColNumber - 1) {
+			state = SOLUTION_DOESNT_EXIST;
+			break;
 		}
 	}
 
