@@ -5,7 +5,7 @@
 		[] Контроль данных (защита от «дурака»)
 		[x] [Сохранение введённой задачи в файл] и чтение из файла.
 		[x] В пошаговом режиме возможность возврата назад.
-		[] Справка.
+		[x] Справка.
 		[x] Контекстно-зависимая помощь.
 		[x] Возможность решения задачи с использованием заданных базисных переменных.
 		[x] Возможность диалогового ввода размерности задачи и матрицы коэффициентов целевой функции в канонической форме. Размерность не более 16*16.
@@ -14,6 +14,10 @@
 		[x] В пошаговом режиме возможность выбора опорного элемента.
 		[x] Поддержка мыши.
 */
+
+// TODO: Check if number of basis variables are equal to number of constraints
+// TODO: Check if resulting vector matches column B of an original matrix
+// TODO: Check if chosen basis doesn't lead to degenerative matrix
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -852,7 +856,7 @@ void Print(Matrix& matrix) {
 	}
 }
 
-template<typename MatrixType, typename ElementType>Step ExplicitBasis(Step step, MatrixType& matrix, std::vector<ElementType>& ExplicitBasis, std::vector<ElementType>& TargetFunction) {
+template<typename MatrixType, typename ElementType>Step ExplicitBasis(Step step, MatrixType& matrix, std::vector<ElementType>& ExplicitBasis, std::vector<bool> &ActiveBasis, std::vector<ElementType>& TargetFunction) {
 	// Type-independent zero element
 	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
 	ElementType ZeroElement;
@@ -863,22 +867,22 @@ template<typename MatrixType, typename ElementType>Step ExplicitBasis(Step step,
 	}
 
 	// 1. Prepare matrix to Gauss elimination
-	std::vector<int> PositionsOfNonZeroElements;
+	std::vector<int> PositionsOfActiveElements;
 	std::vector<int> VariablesPositions;
 	for (int i = 0; i < ExplicitBasis.size(); i++) {
 		VariablesPositions.push_back(i + 1);
 	}
 
 	// 1.1 Find positions of non-zero elements
-	for (int i = 0; i < ExplicitBasis.size(); i++) {
-		if (Genfabs(ExplicitBasis[i]) >= ZeroElement) {
-			PositionsOfNonZeroElements.push_back(i);
+	for (int i = 0; i < ActiveBasis.size(); i++) {
+		if (ActiveBasis[i]) {
+			PositionsOfActiveElements.push_back(i);
 		}
 	}
 
 	// 1.2 Swap matrix column and variables to first (RowNumber) columns
-	for (int i = 0; i < PositionsOfNonZeroElements.size(); i++) {
-		int NonZeroPosition = PositionsOfNonZeroElements[i];
+	for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
+		int NonZeroPosition = PositionsOfActiveElements[i];
 		matrix.SwapColumns(i, NonZeroPosition);
 		std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
 	}
@@ -916,10 +920,14 @@ int main() {
 	bool StartSimplexAlgorithm = false;
 	bool SizeConfirmedReadyToContinue = false;
 	bool ContinueToProblemInput = false;
+
+	bool ErrorInExplicitBasis = false;
+
 	std::vector<Fraction> FractionalTargetFunction(1);
 	std::vector<float> RealTargetFunction(1);
 	std::vector<Fraction> FractionalExplicitBasis(1);
 	std::vector<float> RealExplicitBasis(1);
+	std::vector<bool> BasisActive(1);
 	Matrix RealMatrix(1, 1);
 	FractionalMatrix FracMatrix(1, 1);
 	Step step(RealMatrix, FracMatrix);
@@ -965,7 +973,7 @@ int main() {
 
 		// Main menu bar
 		bool IsReadHasHappened = false;
-		GUILayer::MainMenuBar(RealMatrix, FracMatrix, NumberOfVariables, NumberOfLimitations, IsReadHasHappened, IsFractionalCoefficients);
+		GUILayer::MainMenuBar(RealMatrix, FracMatrix, BasisActive, NumberOfVariables, NumberOfLimitations, IsReadHasHappened, IsFractionalCoefficients);
 
 		// If we read data from a file we fast forward all configuration steps
 		if (IsReadHasHappened) {
@@ -1051,6 +1059,8 @@ int main() {
 			FractionalTargetFunction.resize(NumberOfVariables + 1);
 			FractionalExplicitBasis.resize(NumberOfVariables);
 
+			BasisActive.resize(NumberOfVariables);
+
 			SizeConfirmedReadyToContinue = true;
 		}
 		ImGui::SameLine(); GUILayer::HelpMarker(u8"Размерность будет изменена только после нажатия кнопки 'Применить'.");
@@ -1110,7 +1120,7 @@ int main() {
 				if (!IsFractionalCoefficients) {
 					ImGui::PushID("Real Basis");
 					// Real basis input
-					GUILayer::InputVector(RealExplicitBasis, RealExplicitBasis.size(),
+					GUILayer::InputVector(RealExplicitBasis, &BasisActive, RealExplicitBasis.size(),
 						// Print Function
 						[](int Size) {
 							for (int i = 0; i < Size; i++) {
@@ -1122,7 +1132,7 @@ int main() {
 				} else {
 					ImGui::PushID("Fractional Basis");
 					// Fractional basis input
-					GUILayer::InputVector(FractionalExplicitBasis, FractionalExplicitBasis.size(),
+					GUILayer::InputVector(FractionalExplicitBasis, &BasisActive, FractionalExplicitBasis.size(),
 						// Print Function
 						[](int Size) {
 							for (int i = 0; i < Size; i++) {
@@ -1159,7 +1169,7 @@ int main() {
 			if (!IsFractionalCoefficients) {
 				ImGui::PushID("Real Function");
 				// Target function input with lambda expression
-				GUILayer::InputVector(RealTargetFunction, RealTargetFunction.size(),
+				GUILayer::InputVector(RealTargetFunction, NULL, RealTargetFunction.size(),
 					// Print Function
 					[](int Size) {
 						for (int i = 0; i < Size - 1; i++) {
@@ -1174,7 +1184,7 @@ int main() {
 				ImGui::PushID("Fractional Function");
 
 				// Target function input with lambda expression
-				GUILayer::InputVector(FractionalTargetFunction, FractionalTargetFunction.size(),
+				GUILayer::InputVector(FractionalTargetFunction, NULL, FractionalTargetFunction.size(),
 					// Print Function
 					[](int Size) {
 						for (int i = 0; i < Size - 1; i++) {
@@ -1220,6 +1230,20 @@ int main() {
 			}
 		}
 		ImGui::End();
+
+		// Handle explicit basis errors
+		if (ErrorInExplicitBasis) {
+			int Choice = GUILayer::ErrorMessage(u8"Число базисных переменных не совпадает с числом ограничений.");
+			if (Choice == 0) {
+				// User agreed to use artificial basis
+				ErrorInExplicitBasis = false;
+				IsArtificialBasis = true;
+				UnconfirmedIsArtificialBasis = true;
+			} else if (Choice == 1) {
+				// User chosed to correct the mistake
+				ErrorInExplicitBasis = false;
+			}
+		}
 
 		// Jump here if window was closed
 		BeforeShowSolutionTarget:
@@ -1323,6 +1347,28 @@ int main() {
 					ImGui::EndTabItem();
 				}
 			} else {
+				// TODO: Add input checks
+				// [] Check if input vector doesn't lead to degenerate matrix
+				// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
+				//		or drop this method and use artificial basis instead
+
+				// First check if number of active elements in the explicit vector less or equal then a number of limitations
+				int AmountOfActiveElements = 0;
+				for (auto El : BasisActive) {
+					// If it is an active element add 1 to counter
+					if (El) { AmountOfActiveElements += 1; }
+				}
+
+				// If there's a difference between number of active elements and number of constraints 
+				if (AmountOfActiveElements != RealMatrix.RowNumber - 1) {
+					ErrorInExplicitBasis = true;
+					ShowSolution = false;
+					ImGui::EndTabBar();
+					ImGui::End();
+					goto BeforeShowSolutionTarget;
+				}
+
+
 				// Explicit basis tab
 				if (ImGui::BeginTabItem(u8"Решение для заданного базиса")) {
 					// Explicit Basis Steps
@@ -1333,22 +1379,6 @@ int main() {
 						step.IsAutomatic = IsAutomatic;
 						step.IsCompleted = false;
 						step.IsArtificialStep = false;
-						// TODO: Add input checks
-						// [] Check if input vector doesn't lead to degenerate matrix
-						// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
-						//		or drop this method and use artificial basis instead
-						// First check if number of non-zero elements in the explicit vector less or equal then a number of limitations
-						int AmountOfNonZeroElements = 0;
-						for (float el : RealExplicitBasis) {
-							if (fabs(el) > EPSILON) {
-								AmountOfNonZeroElements += 1;
-							}
-						}
-
-						if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
-							printf("\nNumber of non-zero elements greater then number of limitations\n");
-							assert(0);
-						}
 
 						if (!step.IsAutomatic) {
 							step.IsWaitingForInput = true;
@@ -1359,12 +1389,12 @@ int main() {
 						if (IsFractionalCoefficients) {
 							// Fractional case
 							FractionalMatrix matrix = step.FracMatrix;
-							step = ExplicitBasis(step, matrix, FractionalExplicitBasis, FractionalTargetFunction);
+							step = ExplicitBasis(step, matrix, FractionalExplicitBasis, BasisActive, FractionalTargetFunction);
 							step.FracMatrix = matrix;
 						} else {
 							// Real case
 							Matrix matrix = step.RealMatrix;
-							step = ExplicitBasis(step, matrix, RealExplicitBasis, RealTargetFunction);
+							step = ExplicitBasis(step, matrix, RealExplicitBasis, BasisActive, RealTargetFunction);
 							step.RealMatrix = matrix;
 						}
 						step.IsCompleted = true;

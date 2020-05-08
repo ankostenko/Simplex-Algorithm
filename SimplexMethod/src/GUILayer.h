@@ -65,8 +65,8 @@ Fraction FractionInput(Fraction& InputFraction) {
 	return InputFraction;
 }
 
-template<typename VectorType, typename Proc> void InputVector(std::vector<VectorType> &Vector, int Size, Proc PrintFunction) {
-	ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + Size * 140, 0.0f));
+template<typename VectorType, typename Proc> void InputVector(std::vector<VectorType> &Vector, std::vector<bool> *BasisActive, int Size, Proc PrintFunction) {
+	ImGui::SetNextWindowContentSize(ImVec2(ImGui::GetCursorPos().x + Size * 170.0f, 0.0f));
 	ImGui::BeginChild(Vector.size(), ImVec2(0, ImGui::GetFontSize() * 4), false, ImGuiWindowFlags_HorizontalScrollbar);
 	
 	ImGui::Columns(Size);
@@ -74,7 +74,7 @@ template<typename VectorType, typename Proc> void InputVector(std::vector<Vector
 	// Names of variables
 	PrintFunction(Size);
 	ImGui::Separator();
-	
+
 	for (int i = 0; i < Size; i++) {
 		ImGui::PushID(i);
 		ImGui::SetNextItemWidth(75);
@@ -86,6 +86,14 @@ template<typename VectorType, typename Proc> void InputVector(std::vector<Vector
 		} else {
 			// Fractional case
 			Vector.at(i) = FractionInput(Vector[i]);
+		}
+
+		if (BasisActive) {
+			bool temp = (*BasisActive)[i];
+			ImGui::PushID((std::string("check") + std::to_string(i)).c_str());
+			ImGui::SameLine(); ImGui::Checkbox("", &temp);
+			ImGui::PopID();
+			(*BasisActive)[i] = temp;
 		}
 
 		if (i < Size - 1) { ImGui::SameLine(); }
@@ -305,12 +313,12 @@ void DisplaySteps(std::vector<Step> Steps, int StartIndex, bool IsFractionalCoef
 	}
 }
 
-bool ErrorWindow(const char *ErrorMessage) {
+bool MessageWindow(const char *Message) {
 	ImGui::OpenPopup(u8"Ошибка");
 
 	if (ImGui::BeginPopupModal(u8"Ошибка", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
-		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - ImGui::CalcTextSize(ErrorMessage).x / 2);
-		ImGui::Text(ErrorMessage);
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - ImGui::CalcTextSize(Message).x / 2);
+		ImGui::Text(Message);
 		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - 30.0f);
 		if (ImGui::Button(u8"ОК", ImVec2(60, 30))) { 
 			ImGui::CloseCurrentPopup(); 
@@ -321,6 +329,35 @@ bool ErrorWindow(const char *ErrorMessage) {
 	}
 
 	return false;
+}
+
+int ErrorMessage(const char *ErrorMessage) {
+	ImGui::OpenPopup(u8"Ошибка");
+
+	ImGui::SetNextWindowSize(ImVec2(550, 150), ImGuiCond_Appearing);
+	if (ImGui::BeginPopupModal(u8"Ошибка", 0)) {
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - ImGui::CalcTextSize(ErrorMessage).x / 2);
+		ImGui::TextWrapped(ErrorMessage);
+		ImGui::BeginChild("Error", ImVec2(0, 40), true);
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - ImGui::CalcTextSize(u8"Использовать метод искусственного базиса?").x / 2);
+		ImGui::TextWrapped(u8"Использовать метод искусственного базиса?");
+		ImGui::EndChild();
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - 60.0f);
+		if (ImGui::Button(u8"Да", ImVec2(60, 30))) {
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return 0;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(u8"Нет", ImVec2(60, 30))) {
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return 1;
+			
+		}
+		ImGui::EndPopup();
+	}
+	return 2;
 }
 
 void ReferencePopup(bool &OpenReferencePopup) {
@@ -379,7 +416,7 @@ void ReferencePopup(bool &OpenReferencePopup) {
 	}
 }
 
-void MainMenuBar(Matrix& RealMatrix, FractionalMatrix& FracMatrix, int& OutNumberOfVariables, int& OutNumberOfLimitations, bool& IsReadHasHappened, int& IsFractionalCoeffs) {
+void MainMenuBar(Matrix& RealMatrix, FractionalMatrix& FracMatrix, std::vector<bool> &BasisActive, int& OutNumberOfVariables, int& OutNumberOfLimitations, bool& IsReadHasHappened, int& IsFractionalCoeffs) {
 	// Default path initialization
 	static WCHAR DEFAULT_PATH[256];
 	GetModuleFileName(NULL, (WCHAR*)DEFAULT_PATH, 256);
@@ -400,7 +437,7 @@ void MainMenuBar(Matrix& RealMatrix, FractionalMatrix& FracMatrix, int& OutNumbe
 
 	if (ErrorOccured) {
 		// If window is closed
-		if (ErrorWindow(ErrorMessage)) {
+		if (MessageWindow(ErrorMessage)) {
 			ErrorOccured = false;
 		}
 	}
@@ -498,6 +535,7 @@ void MainMenuBar(Matrix& RealMatrix, FractionalMatrix& FracMatrix, int& OutNumbe
 					OutNumberOfVariables = NumberOfVariables;
 					FracMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
 					RealMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
+					BasisActive.resize(NumberOfVariables - 1);
 
 					if (IsFractionalCoefficients) {
 						for (int i = 0; i < NumberOfLimitations; i++) {
