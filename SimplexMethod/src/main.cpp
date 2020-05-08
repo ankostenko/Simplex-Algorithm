@@ -1139,7 +1139,6 @@ int main() {
 								ImGui::Text((std::string("x") + std::to_string(i + 1)).c_str());
 								ImGui::NextColumn();
 							}
-							ImGui::NextColumn();
 						});
 					ImGui::PopID();
 				}
