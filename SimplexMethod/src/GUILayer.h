@@ -321,7 +321,58 @@ bool ErrorWindow(const char *ErrorMessage) {
 	return false;
 }
 
-void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumberOfVariables, int &OutNumberOfLimitations, bool &IsReadHasHappened, int &IsFractionalCoeffs) {
+void ReferencePopup(bool &OpenReferencePopup) {
+	ImGui::SetNextWindowSize(ImVec2(600, 450), ImGuiCond_FirstUseEver);
+	if (ImGui::BeginPopupModal(u8"Справка", &OpenReferencePopup)) {
+		if (ImGui::BeginTabBar("Reference")) {
+			if (ImGui::BeginTabItem(u8"Как пользоваться программой")) {
+				ImGui::BeginChild("User guide", ImVec2(0, 0), true);
+				ImGui::Text(u8"");
+				ImGui::EndChild();
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem(u8"Работа с файлами")) {
+				if (ImGui::BeginTabBar("Files")) {
+					if (ImGui::BeginTabItem(u8"Чтение")) {
+						ImGui::BeginChild("File Work", ImVec2(0, 165), true);
+						ImGui::TextWrapped(u8"Два первых числа - размерность задачи.\nПервое число - количество ограничений, второе - количество столбцов в матрице.");
+						ImGui::TextWrapped(u8"Затем по порядку написаны все элементы матрицы.\nВ случае дробей до и после '/' не должно быть пробелов. Знаменатель должен быть явно указан.");
+						ImGui::EndChild();
+						ImGui::TextWrapped(u8"Пример:");
+						ImGui::Text(u8"Действительные числа");
+						ImGui::BeginChild("Example", ImVec2(0, 215), true);
+						ImGui::Text(u8"2\n3\n1 2 3\n1 2 3");
+						ImGui::Text(u8"Обыкновенные дроби");
+						ImGui::Text(u8"2\n3\n1/1 2/1 3/1\n1/1 2/1 3/1");
+						ImGui::EndChild();
+						ImGui::EndTabItem();
+					}
+					if (ImGui::BeginTabItem(u8"Запись")) {
+						ImGui::BeginChild("Writing", ImVec2(0, 130), true);
+						ImGui::TextWrapped(u8"При сохранении будет сохраняться выбранная матрица,"
+							" а не та, которая в данный момент показана на экране, поэтому," 
+							" если была введена только матрица с действительными коэффициентами, а сохраняется как с обыкновенными дробями,"
+							" то будет сохранена матрица с обыкновенными дробями, но с неинициализированными элементами.");
+						ImGui::EndChild();
+						ImGui::EndTabItem();
+					}
+					ImGui::EndTabBar();
+				}
+				ImGui::EndTabItem();
+			}
+			ImGui::EndTabBar();
+		}
+	
+		if (ImGui::Button(u8"Закрыть")) {
+			ImGui::CloseCurrentPopup();
+			OpenReferencePopup = false;
+		}
+
+		ImGui::EndPopup();
+	}
+}
+
+void MainMenuBar(Matrix& RealMatrix, FractionalMatrix& FracMatrix, int& OutNumberOfVariables, int& OutNumberOfLimitations, bool& IsReadHasHappened, int& IsFractionalCoeffs) {
 	// Default path initialization
 	static WCHAR DEFAULT_PATH[256];
 	GetModuleFileName(NULL, (WCHAR*)DEFAULT_PATH, 256);
@@ -330,11 +381,12 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 	static std::string StrDEFULAT_PATH = std::regex_replace(std::string(STR_DEFAULT_PATH.begin(), STR_DEFAULT_PATH.end()), target, " ");
 	// Patterns
 	char const* lFilterPatterns[2] = { "*.txt", "*.text" };
-	
-	
+
+
 	static bool OpenAboutPopup = false;
 	static bool OpenFileOpenPopup = false;
 	static bool OpenFileSavePopup = false;
+	static bool OpenReferencePopup = false;
 	static int IsFractionalCoefficients = 0;
 	static bool ErrorOccured = false;
 	const static char* ErrorMessage;
@@ -358,6 +410,9 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 		}
 
 		if (ImGui::BeginMenu(u8"Справка")) {
+			if (ImGui::MenuItem(u8"Справка")) {
+				OpenReferencePopup = true;
+			}
 			if (ImGui::MenuItem(u8"О программе")) {
 				OpenAboutPopup = true;
 			}
@@ -366,9 +421,14 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 		ImGui::EndMainMenuBar();
 	}
+
 	if (OpenAboutPopup) { ImGui::OpenPopup(u8"О программе"); }
 	if (OpenFileOpenPopup) { ImGui::OpenPopup(u8"Открыть файл"); }
 	if (OpenFileSavePopup) { ImGui::OpenPopup(u8"Сохранить файл"); }
+	if (OpenReferencePopup) { ImGui::OpenPopup(u8"Справка"); }
+
+	// Reference popup
+	ReferencePopup(OpenReferencePopup);
 
 	ImGui::SetNextWindowSize(ImVec2(ImGui::GetWindowSize().x * 0.7f, 160.0f));
 	if (ImGui::BeginPopupModal(u8"О программе", &OpenAboutPopup, ImGuiWindowFlags_NoResize)) {
@@ -398,7 +458,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 		ImGui::EndChild();
 		if (ImGui::Button(u8"Применить")) {
-			const char *path = tinyfd_openFileDialog("Открыть файл", StrDEFULAT_PATH.c_str(), 2, lFilterPatterns, NULL, false);
+			const char* path = tinyfd_openFileDialog("Открыть файл", StrDEFULAT_PATH.c_str(), 2, lFilterPatterns, NULL, false);
 			std::string filename;
 			if (path != NULL) {
 				filename = path;
@@ -428,7 +488,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 				if (!ErrorOccured) {
 					OutNumberOfLimitations = NumberOfLimitations;
-					OutNumberOfVariables   = NumberOfVariables;
+					OutNumberOfVariables = NumberOfVariables;
 					FracMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
 					RealMatrix.Resize(NumberOfLimitations + 1, NumberOfVariables);
 
@@ -459,7 +519,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 
 				fclose(file);
 			}
-			
+
 			OpenFileOpenPopup = false;
 			ImGui::CloseCurrentPopup();
 		}
@@ -476,7 +536,7 @@ void MainMenuBar(Matrix &RealMatrix, FractionalMatrix &FracMatrix, int &OutNumbe
 		ImGui::Combo("", &IsFractionalCoefficients, u8"Действительные числа\0Обыкновенные дроби\0");
 		ImGui::PopID();
 		ImGui::EndChild();
-	
+
 		if (ImGui::Button(u8"Применить")) {
 			const char* path = tinyfd_saveFileDialog(u8"Открыть файл", StrDEFULAT_PATH.c_str(), 2, lFilterPatterns, NULL);
 			std::string filename;

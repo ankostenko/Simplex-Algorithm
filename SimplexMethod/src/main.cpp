@@ -895,6 +895,8 @@ int main() {
 	Step step(RealMatrix, FracMatrix);
 	ArtificialBasisSteps.push_back(step);
 
+	bool FocusOnSolutionWindow = false;
+
 	glfwInit();
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -945,6 +947,18 @@ int main() {
 
 			FractionalTargetFunction.resize(NumberOfVariables);
 			FractionalExplicitBasis.resize(NumberOfVariables - 1);
+
+			Step FirstStep = ArtificialBasisSteps[0];
+			ArtificialBasisSteps.clear();
+			FirstStep.NumbersOfVariables.resize(NumberOfVariables);
+			ArtificialBasisSteps.push_back(FirstStep);
+			SimplexAlgorithmSteps.clear();
+			ExplicitBasisSteps.clear();
+			PreviousSimplexStepID = -1;
+			PreviousArtificialStepID = -1;
+
+			StartSimplexAlgorithm = false;
+			ShowSolution = false;
 		}
 
 		// Docking 
@@ -1148,7 +1162,6 @@ int main() {
 
 			if (ImGui::Button(u8"Решить")) {
 				ShowSolution = true;
-
 				Step FirstStep = ArtificialBasisSteps[0];
 				ArtificialBasisSteps.clear();
 				ArtificialBasisSteps.push_back(FirstStep);
@@ -1157,8 +1170,9 @@ int main() {
 				StartSimplexAlgorithm = false;
 				PreviousSimplexStepID = -1;
 				PreviousArtificialStepID = -1;
+				FocusOnSolutionWindow = true;
 			}
-			GUILayer::HelpMarker(u8"'Решить' при повторном нажатии начинает решение сначала."); ImGui::SameLine();
+			ImGui::SameLine();  GUILayer::HelpMarker(u8"'Решить' при повторном нажатии начинает решение сначала.");
 
 			if (ShowSolution) {
 				ImGui::SameLine();
@@ -1180,7 +1194,12 @@ int main() {
 		// Jump here if window was closed
 		BeforeShowSolutionTarget:
 		if (ShowSolution) {
-			ImGui::Begin(u8"Решение", &ShowSolution, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+			if (FocusOnSolutionWindow) {
+				ImGui::SetNextWindowFocus();
+				FocusOnSolutionWindow = false;
+			}
+
+			ImGui::Begin(u8"Решение", &ShowSolution);
 			// If solution window was closed we need to restore state to non-solved
 			if (ShowSolution == false) {
 				Step FirstStep = ArtificialBasisSteps[0];
@@ -1240,8 +1259,7 @@ int main() {
 						}
 						ArtificialBasisSteps.push_back(step);
 					}
-
-
+					
 					if (!step.IsAutomatic) {
 						step.IsWaitingForInput = true;
 					} else {
@@ -1299,6 +1317,12 @@ int main() {
 						if (AmountOfNonZeroElements > step.RealMatrix.RowNumber - 1) {
 							printf("\nNumber of non-zero elements greater then number of limitations\n");
 							assert(0);
+						}
+
+						if (!step.IsAutomatic) {
+							step.IsWaitingForInput = true;
+						} else {
+							step.IsWaitingForInput = false;
 						}
 
 						if (IsFractionalCoefficients) {
@@ -1391,7 +1415,6 @@ int main() {
 
 			ToStartOfSimplexAlgorithm:
 			if (StartSimplexAlgorithm) {
-				ImGui::SetNextWindowFocus();
 				if (ImGui::BeginTabItem(u8"Симплекс алгоритм", &StartSimplexAlgorithm, SimplexAlgorithmTabFlags)) {
 					// Simplex algorithm's tab has been closed
 					if (StartSimplexAlgorithm == false) {

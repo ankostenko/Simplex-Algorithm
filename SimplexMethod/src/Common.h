@@ -448,7 +448,6 @@ struct Step {
 	// First m variables are basis variables
 	std::vector<int> NumbersOfVariables;
 	bool IsArtificialStep;
-	bool IsSolutionUmlimited;
 
 	Step() = default;
 
