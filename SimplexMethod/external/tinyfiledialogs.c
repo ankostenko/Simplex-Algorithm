@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 /*_________
  /         \ tinyfiledialogs.c v2.9.3 [July 12, 2017] zlib licence
  |tiny file| Unique code file created [November 9, 2014]

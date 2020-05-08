@@ -166,7 +166,7 @@ struct Fraction {
 
 	Fraction operator/(Fraction other) const {
 		if (other.numerator == 0) {
-			Fraction(0, 1);
+			return Fraction(0, 1);
 		}
 		int TempNumerator = numerator;
 		int TempDenominator = denominator;
@@ -218,7 +218,6 @@ struct Fraction {
 			int temp = denominator;
 			denominator *= other.denominator;
 			numerator *= other.denominator;
-			OtherNumerator = other.numerator;
 			OtherNumerator *= temp;
 		}
 
@@ -307,6 +306,7 @@ struct FractionalMatrix {
 	}
 
 	FractionalMatrix& operator=(const FractionalMatrix& mat) {
+		delete[] matrix;
 		matrix = new Fraction[mat.RowNumber * mat.ColNumber];
 		memmove(matrix, mat.matrix, mat.RowNumber * mat.ColNumber * sizeof(Fraction));
 		RowNumber = mat.RowNumber;
@@ -398,6 +398,7 @@ public:
 	}
 
 	Matrix& operator=(const Matrix &mat) {
+		delete[] matrix;
 		matrix = new float[mat.RowNumber * mat.ColNumber];
 		memmove(matrix, mat.matrix, mat.RowNumber * mat.ColNumber * sizeof(float));
 		RowNumber = mat.RowNumber;

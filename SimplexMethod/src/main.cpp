@@ -1,8 +1,10 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 /*
 		[x] Работа с обыкновенными и десятичными дробями.
 		[] Контроль данных (защита от «дурака»)
 		[x] [Сохранение введённой задачи в файл] и чтение из файла.
-		[] В пошаговом режиме возможность возврата назад.
+		[x] В пошаговом режиме возможность возврата назад.
 		[] Справка.
 		[x] Контекстно-зависимая помощь.
 		[x] Возможность решения задачи с использованием заданных базисных переменных.
@@ -1174,9 +1176,6 @@ int main() {
 			}
 		}
 		ImGui::End();
-		// ====================================
-		//		VERIFIED UNTIL THAT POINT
-		// ====================================
 
 		// Jump here if window was closed
 		BeforeShowSolutionTarget:
@@ -1213,6 +1212,7 @@ int main() {
 						step.IsAutomatic = IsAutomatic;
 						step.IsCompleted = false;
 						step.IsArtificialStep = true;
+						step.NumbersOfVariables.clear();
 						// Artificial variables
 						if (IsFractionalCoefficients) {
 							for (int i = 0; i < step.FracMatrix.RowNumber - 1; i++) {
@@ -1257,6 +1257,18 @@ int main() {
 					} else {
 						ArtificialBasis<FractionalMatrix, Fraction>(step);
 					}
+
+					// Step back
+					ImGui::SameLine();
+					LastElementIndex = ArtificialBasisSteps.size() - 1;
+					if (!step.IsAutomatic && LastElementIndex > 1 && ImGui::Button(u8"Шаг назад")) {
+						// One before this last element
+						step = ArtificialBasisSteps[LastElementIndex - 1];
+						ArtificialBasisSteps.erase(ArtificialBasisSteps.begin() + LastElementIndex);
+						StartSimplexAlgorithm = false;
+						SimplexAlgorithmSteps.clear();
+					}	
+
 					ImGui::Separator();
 					ImGui::EndChild();
 					ImGui::EndTabItem();
@@ -1320,6 +1332,7 @@ int main() {
 
 					if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
 						StartSimplexAlgorithm = true;
+						PreviousArtificialStepID = ArtificialBasisSteps[ArtificialBasisSteps.size() - 1].StepID;
 						SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
 					}
 					ImGui::PopID();
@@ -1376,12 +1389,16 @@ int main() {
 				}
 			}
 
+			ToStartOfSimplexAlgorithm:
 			if (StartSimplexAlgorithm) {
 				ImGui::SetNextWindowFocus();
 				if (ImGui::BeginTabItem(u8"Симплекс алгоритм", &StartSimplexAlgorithm, SimplexAlgorithmTabFlags)) {
 					// Simplex algorithm's tab has been closed
 					if (StartSimplexAlgorithm == false) {
 						SimplexAlgorithmSteps.clear();
+						PreviousSimplexStepID = -1;
+						ImGui::EndTabItem();
+						goto ToStartOfSimplexAlgorithm;
 					}
 
 					if (SimplexAlgorithmSteps.size() == 0) {
@@ -1428,6 +1445,32 @@ int main() {
 					} else {
 						SimplexAlgorithm<Matrix, float>(step);
 					}
+
+					// Step back
+					int LastElementIndex = SimplexAlgorithmSteps.size() - 1;
+					if (!step.IsAutomatic && LastElementIndex > -1) {
+						ImGui::PushID("Step Back Simplex Method");
+						ImGui::SameLine();
+						if (ImGui::Button(u8"Шаг назад")) {
+							// If it is first step we need to return to artificial basis steps
+							if (LastElementIndex == 0) {
+								SimplexAlgorithmSteps.clear();
+								PreviousSimplexStepID = -1;
+								ImGui::PopID();
+								ImGui::EndChild();
+								ImGui::PopID();
+								ImGui::EndTabItem();
+								StartSimplexAlgorithm = false;
+								goto ToStartOfSimplexAlgorithm;
+							}
+							
+							// One before this last element
+							step = SimplexAlgorithmSteps[LastElementIndex - 1];
+							SimplexAlgorithmSteps.erase(SimplexAlgorithmSteps.begin() + LastElementIndex);
+						}
+						ImGui::PopID();
+					}
+
 					ImGui::EndChild();
 					ImGui::PopID();
 
