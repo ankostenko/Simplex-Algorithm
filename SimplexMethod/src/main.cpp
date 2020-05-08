@@ -1315,6 +1315,7 @@ int main() {
 						ArtificialBasisSteps.erase(ArtificialBasisSteps.begin() + LastElementIndex);
 						StartSimplexAlgorithm = false;
 						SimplexAlgorithmSteps.clear();
+						PreviousArtificialStepID = -1;
 					}	
 
 					ImGui::Separator();

@@ -6,6 +6,7 @@ const char* ComboBoxVariablesLabel = u8"Число переменных ";
 const char* ComboBoxLimitationsLabel = u8"Число ограничений";
 
 static void HelpMarker(const char* desc) {
+	ImGui::PushID(desc);
 	ImGui::TextDisabled("(?)");
 	if (ImGui::IsItemHovered()) {
 		ImGui::BeginTooltip();
@@ -14,6 +15,7 @@ static void HelpMarker(const char* desc) {
 		ImGui::PopTextWrapPos();
 		ImGui::EndTooltip();
 	}
+	ImGui::PopID();
 }
 
 int ComboBox(const char *label, int FileVariables, int FileLimitations, bool FileReadHasHappened) {
@@ -326,8 +328,13 @@ void ReferencePopup(bool &OpenReferencePopup) {
 	if (ImGui::BeginPopupModal(u8"Справка", &OpenReferencePopup)) {
 		if (ImGui::BeginTabBar("Reference")) {
 			if (ImGui::BeginTabItem(u8"Как пользоваться программой")) {
-				ImGui::BeginChild("User guide", ImVec2(0, 0), true);
-				ImGui::Text(u8"");
+				ImGui::BeginChild("User guide", ImVec2(0, 330), true);
+				ImGui::TextWrapped(u8"Начало работы:");
+				ImGui::TextWrapped(u8"1. Введите размерности.\n2. Выберите параметры решения задачи.\n3. Введите данные.\n4. Нажмите решить.");
+				ImGui::Separator();
+				ImGui::TextWrapped(u8"После метода искусственного базиса и явно заданного базиса внизу появится кнопка "
+									"'Продолжить симплекс алгоритм', возможно, нужно будет пролистнуть немного вниз, чтобы ее увидеть");
+				ImGui::TextWrapped(u8"После завершения решения ответ будет показываться внизу экрана.");
 				ImGui::EndChild();
 				ImGui::EndTabItem();
 			}
