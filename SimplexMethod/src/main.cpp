@@ -1,20 +1,5 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
-/*
-		[x] Работа с обыкновенными и десятичными дробями.
-		[x] Контроль данных (защита от «дурака»)
-		[x] [Сохранение введённой задачи в файл] и чтение из файла.
-		[x] В пошаговом режиме возможность возврата назад.
-		[x] Справка.
-		[x] Контекстно-зависимая помощь.
-		[x] Возможность решения задачи с использованием заданных базисных переменных.
-		[x] Возможность диалогового ввода размерности задачи и матрицы коэффициентов целевой функции в канонической форме. Размерность не более 16*16.
-		[x] Реализация метода искусственного базиса.
-		[x] Выбор автоматического и пошагового режима решения задачи.
-		[x] В пошаговом режиме возможность выбора опорного элемента.
-		[x] Поддержка мыши.
-*/
-
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
@@ -1562,7 +1547,8 @@ int main() {
 
 					if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
 						StartSimplexAlgorithm = true;
-						PreviousArtificialStepID = ArtificialBasisSteps[ArtificialBasisSteps.size() - 1].StepID;
+						PreviousArtificialStepID = -1;
+						PreviousSimplexStepID = -1;
 						SimplexAlgorithmTabFlags |= ImGuiTabItemFlags_SetSelected;
 					}
 					ImGui::PopID();

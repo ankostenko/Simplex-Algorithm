@@ -30,6 +30,9 @@ int ComboBox(const char *label, int FileVariables, int FileLimitations, bool Fil
 	static int CallOneCurrentItem = 0;
 	static int CallTwoCurrentItem = 0;
 
+	if (CallTwoCurrentItem == 0) { CallTwoCurrentItem = 1; }
+	if (CallOneCurrentItem >= CallTwoCurrentItem) { CallOneCurrentItem = CallTwoCurrentItem - 1; }
+
 	static int *CurrentItem = NULL;
 	if (CallNumber == 0) {
 		if (FileReadHasHappened) { CallOneCurrentItem = FileLimitations; }
