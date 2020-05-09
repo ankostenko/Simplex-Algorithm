@@ -850,6 +850,7 @@ template<typename MatrixType, typename ElementType> void GaussElimination(Matrix
 }
 
 void Print(Matrix& matrix) {
+	printf("\n");
 	for (int i = 0; i < matrix.RowNumber - 1; i++) {
 		for (int j = 0; j < matrix.ColNumber; j++) {
 			printf("%f ", matrix[i][j]);
@@ -1363,67 +1364,6 @@ int main() {
 						PositionsOfActiveElements.push_back(i);
 					}
 				}
-				if (IsFractionalCoefficients) {
-					// Swap matrix column and variables to first (RowNumber) columns
-					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
-						int NonZeroPosition = PositionsOfActiveElements[i];
-						FracMatrix.SwapColumns(i, NonZeroPosition);
-						std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
-					}
-
-					// Gauss Elimination
-					FractionalMatrix matrix = FracMatrix;
-					GaussElimination<FractionalMatrix, Fraction>(matrix);
-
-					// Check if there's zero rows
-					for (int i = 0; i < matrix.RowNumber - 1; i++) {
-						int CountOfZeroes = 0;
-						for (int j = 0; j < matrix.RowNumber - 1; j++) {
-							if (matrix[i][j] == Fraction(0, 1)) {
-								CountOfZeroes += 1;
-							}
-						}
-						if (CountOfZeroes == matrix.RowNumber - 1) {
-							ExplicitBasisErrorMessage = u8"ƒанный базис дает вырожденную минор.";
-							ErrorInExplicitBasis = true;
-							ShowSolution = false;
-							ImGui::EndTabBar();
-							ImGui::End();
-							goto BeforeShowSolutionTarget;
-							break;
-						}
-					}
-				} else {
-					// Swap matrix column and variables to first (RowNumber) columns
-					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
-						int NonZeroPosition = PositionsOfActiveElements[i];
-						RealMatrix.SwapColumns(i, NonZeroPosition);
-						std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
-					}
-
-					// Gauss Elimination
-					Matrix matrix = RealMatrix;
-					GaussElimination<Matrix, float>(matrix);
-
-					// Check if there's zero rows
-					for (int i = 0; i < matrix.RowNumber - 1; i++) {
-						int CountOfZeroes = 0;
-						for (int j = 0; j < matrix.RowNumber - 1; j++) {
-							if (fabs(matrix[i][j]) < EPSILON) {
-								CountOfZeroes += 1;
-							}
-						}
-						if (CountOfZeroes == matrix.RowNumber - 1) {
-							ExplicitBasisErrorMessage = u8"ƒанный базис дает вырожденную минор.";
-							ErrorInExplicitBasis = true;
-							ShowSolution = false;
-							ImGui::EndTabBar();
-							ImGui::End();
-							goto BeforeShowSolutionTarget;
-							break;
-						}
-					}
-				}
 
 				// Check if number of active elements in the explicit vector less or equal then a number of limitations
 				int AmountOfActiveElements = 0;
@@ -1440,6 +1380,68 @@ int main() {
 					ImGui::EndTabBar();
 					ImGui::End();
 					goto BeforeShowSolutionTarget;
+				}
+
+				if (IsFractionalCoefficients) {
+					FractionalMatrix matrix = FracMatrix;
+					// Swap matrix column and variables to first (RowNumber) columns
+					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
+						int NonZeroPosition = PositionsOfActiveElements[i];
+						matrix.SwapColumns(i, NonZeroPosition);
+						std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
+					}
+
+					// Gauss Elimination
+					GaussElimination<FractionalMatrix, Fraction>(matrix);
+
+					// Check if there's zero rows
+					for (int i = 0; i < matrix.RowNumber - 1; i++) {
+						int CountOfZeroes = 0;
+						for (int j = 0; j < matrix.RowNumber - 1; j++) {
+							if (matrix[i][j] == Fraction(0, 1)) {
+								CountOfZeroes += 1;
+							}
+						}
+						if (CountOfZeroes == matrix.RowNumber - 1) {
+							ExplicitBasisErrorMessage = u8"ƒанный базис дает вырожденный минор.";
+							ErrorInExplicitBasis = true;
+							ShowSolution = false;
+							ImGui::EndTabBar();
+							ImGui::End();
+							goto BeforeShowSolutionTarget;
+							break;
+						}
+					}
+				} else {
+					Matrix matrix = RealMatrix;
+					// Swap matrix column and variables to first (RowNumber) columns
+					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
+						int NonZeroPosition = PositionsOfActiveElements[i];
+						matrix.SwapColumns(i, NonZeroPosition);
+						std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
+					}
+
+					// Gauss Elimination
+					GaussElimination<Matrix, float>(matrix);
+
+					// Check if there's zero rows
+					for (int i = 0; i < matrix.RowNumber - 1; i++) {
+						int CountOfZeroes = 0;
+						for (int j = 0; j < matrix.RowNumber - 1; j++) {
+							if (fabs(matrix[i][j]) < EPSILON) {
+								CountOfZeroes += 1;
+							}
+						}
+						if (CountOfZeroes == matrix.RowNumber - 1) {
+							ExplicitBasisErrorMessage = u8"ƒанный базис дает вырожденный минор.";
+							ErrorInExplicitBasis = true;
+							ShowSolution = false;
+							ImGui::EndTabBar();
+							ImGui::End();
+							goto BeforeShowSolutionTarget;
+							break;
+						}
+					}
 				}
 
 				// Explicit basis tab
