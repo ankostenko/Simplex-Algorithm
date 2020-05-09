@@ -15,8 +15,8 @@
 		[x] Поддержка мыши.
 */
 
-// TODO: Check if number of basis variables are equal to number of constraints
-// TODO: Check if resulting vector matches column B of an original matrix
+// DONE: Check if number of basis variables are equal to number of constraints
+// DONE: Check if resulting vector matches column B of an original matrix
 // TODO: Check if chosen basis doesn't lead to degenerative matrix
 
 #include <imgui/imgui.h>
@@ -841,6 +841,7 @@ template<typename MatrixType, typename ElementType> void GaussElimination(Matrix
 	for (int i = 0; i < matrix.RowNumber - 1; i++) {
 		ElementType Pivot = matrix[i][i];
 		if (Genfabs(Pivot) <= ZeroElement) continue;
+		
 		for (int j = i; j < matrix.ColNumber; j++) {
 			matrix[i][j] = matrix[i][j] / Pivot;
 		}
@@ -922,6 +923,7 @@ int main() {
 	bool ContinueToProblemInput = false;
 
 	bool ErrorInExplicitBasis = false;
+	const char* ExplicitBasisErrorMessage = NULL;
 
 	std::vector<Fraction> FractionalTargetFunction(1);
 	std::vector<float> RealTargetFunction(1);
@@ -1232,7 +1234,7 @@ int main() {
 
 		// Handle explicit basis errors
 		if (ErrorInExplicitBasis) {
-			int Choice = GUILayer::ErrorMessage(u8"Число базисных переменных не совпадает с числом ограничений.");
+			int Choice = GUILayer::ErrorMessage(ExplicitBasisErrorMessage);
 			if (Choice == 0) {
 				// User agreed to use artificial basis
 				ErrorInExplicitBasis = false;
@@ -1346,12 +1348,65 @@ int main() {
 					ImGui::EndTabItem();
 				}
 			} else {
-				// TODO: Add input checks
-				// [] Check if input vector doesn't lead to degenerate matrix
-				// [] If number of non-zero elements in the vector less then number of limitations I need to randomly choose any available variable
-				//		or drop this method and use artificial basis instead
+#if 0
+				// Check if vector doesn't lead to degenerative matrix
+				// Prepare matrix to Gauss elimination
+				std::vector<int> PositionsOfActiveElements;
+				std::vector<int> VariablesPositions;
+				for (int i = 0; i < RealExplicitBasis.size(); i++) {
+					VariablesPositions.push_back(i + 1);
+				}
 
-				// First check if number of active elements in the explicit vector less or equal then a number of limitations
+				// Find positions of non-zero elements
+				for (int i = 0; i < BasisActive.size(); i++) {
+					if (BasisActive[i]) {
+						PositionsOfActiveElements.push_back(i);
+					}
+				}
+
+				if (IsFractionalCoefficients) {
+					// Swap matrix column and variables to first (RowNumber) columns
+					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
+						int NonZeroPosition = PositionsOfActiveElements[i];
+						FracMatrix.SwapColumns(i, NonZeroPosition);
+						std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
+					}
+
+					// Gauss Elimination
+					GaussElimination<FractionalMatrix, Fraction>(FracMatrix);
+					
+					// Check if there's zero rows
+					for (int i = 0; i < FracMatrix.RowNumber - 1; i++) {
+						int CountOfZeroes = 0;
+						for (int j = 0; j < FracMatrix.ColNumber; j++) {
+							if (FracMatrix[i][j] == Fraction(0, 1)) {
+								CountOfZeroes += 1;
+							}
+						}
+						if (CountOfZeroes == FracMatrix.ColNumber) {
+							ExplicitBasisErrorMessage = u8"Данный базис дает вырожденную матрицу.";
+							ErrorInExplicitBasis = true;
+							ShowSolution = false;
+							ImGui::EndTabBar();
+							ImGui::End();
+							goto BeforeShowSolutionTarget;
+							break;
+						}
+					}
+				} else {
+					// Swap matrix column and variables to first (RowNumber) columns
+					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
+						int NonZeroPosition = PositionsOfActiveElements[i];
+						RealMatrix.SwapColumns(i, NonZeroPosition);
+						std::swap(VariablesPositions[i], VariablesPositions[NonZeroPosition]);
+					}
+
+					// Gauss Elimination
+					GaussElimination<Matrix, float>(RealMatrix);
+				}
+#endif
+
+				// Check if number of active elements in the explicit vector less or equal then a number of limitations
 				int AmountOfActiveElements = 0;
 				for (auto El : BasisActive) {
 					// If it is an active element add 1 to counter
@@ -1360,13 +1415,13 @@ int main() {
 
 				// If there's a difference between number of active elements and number of constraints 
 				if (AmountOfActiveElements != RealMatrix.RowNumber - 1) {
+					ExplicitBasisErrorMessage = u8"Число базисных переменных не совпадает с числом ограничений.";
 					ErrorInExplicitBasis = true;
 					ShowSolution = false;
 					ImGui::EndTabBar();
 					ImGui::End();
 					goto BeforeShowSolutionTarget;
 				}
-
 
 				// Explicit basis tab
 				if (ImGui::BeginTabItem(u8"Решение для заданного базиса")) {
@@ -1401,18 +1456,75 @@ int main() {
 						ExplicitBasisSteps.push_back(step);
 					}
 
+					// Sort variables in increasing order
+					std::vector<int> BaseVariables(step.NumbersOfVariables.begin(), step.NumbersOfVariables.begin() + step.RealMatrix.RowNumber - 1);
+					int TotalSize = step.NumbersOfVariables.size();
+
 					ImGui::PushID("Explicit Basis Displaying");
 					ImGui::BeginChild("Solution", ImVec2(0, 100), true);
 					ImGui::Text(u8"Ответ");
 					ImGui::Separator();
 					if (IsFractionalCoefficients) {
 						// Fractional case
-						GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, false);
+						BubbleSort(step.FracMatrix, BaseVariables, true);
+						GUILayer::DisplaySolutionVector(step.FracMatrix, BaseVariables, TotalSize, false);
 					} else {
 						// Real case
-						GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, false);
+						BubbleSort(step.RealMatrix, BaseVariables, true);
+						GUILayer::DisplaySolutionVector(step.RealMatrix, BaseVariables, TotalSize, false);
 					}
 					ImGui::EndChild();
+
+					// Check if resulting vector matches original vector
+					if (IsFractionalCoefficients) {
+						std::vector<Fraction> ResultingVector;
+						int LastColumnIndex = step.FracMatrix.ColNumber - 1;
+						for (int i = 0, BVCounter = 0; i < TotalSize; i++) {
+							if (BVCounter < BaseVariables.size() && i + 1 == BaseVariables[BVCounter]) {
+								ResultingVector.push_back(step.FracMatrix[BVCounter][LastColumnIndex]);
+								BVCounter += 1;
+							} else {
+								ResultingVector.push_back(Fraction(0, 1));
+							}
+						}
+						for (int i = 0; i < step.FracMatrix.RowNumber - 1; i++) {
+							int LastElementIndex = step.FracMatrix.ColNumber - 1;
+							if (ResultingVector[i] != FractionalExplicitBasis[i]) {
+								ExplicitBasisErrorMessage = u8"Полученный вектор не совпадает с исходным вектором B";
+								ErrorInExplicitBasis = true;
+								ShowSolution = false;
+								ImGui::PopID();
+								ImGui::EndTabItem();
+								ImGui::EndTabBar();
+								ImGui::End();
+								goto BeforeShowSolutionTarget;
+							}
+						}
+					} else {
+						std::vector<float> ResultingVector;
+						int LastColumnIndex = step.RealMatrix.ColNumber - 1;
+						for (int i = 0, BVCounter = 0; i < TotalSize; i++) {
+							if (BVCounter < BaseVariables.size() && i + 1 == BaseVariables[BVCounter]) {
+								ResultingVector.push_back(step.RealMatrix[BVCounter][LastColumnIndex]);
+								BVCounter += 1;
+							} else {
+								ResultingVector.push_back(0.0f);
+							}
+						}
+						for (int i = 0; i < step.RealMatrix.RowNumber - 1; i++) {
+							int LastElementIndex = step.RealMatrix.ColNumber - 1;
+							if (fabs(ResultingVector[i] - RealExplicitBasis[i]) > EPSILON) {
+								ExplicitBasisErrorMessage = u8"Полученный вектор не совпадает с исходным вектором B";
+								ErrorInExplicitBasis = true;
+								ShowSolution = false;
+								ImGui::PopID();
+								ImGui::EndTabItem();
+								ImGui::EndTabBar();
+								ImGui::End();
+								goto BeforeShowSolutionTarget;
+							}
+						}
+					}
 
 					if (ImGui::Button(u8"Продолжить симплекс алгоритм")) {
 						StartSimplexAlgorithm = true;
@@ -1434,6 +1546,7 @@ int main() {
 				ImGui::Separator();
 
 				// Display Solution
+				std::vector<int> BaseVariables(step.NumbersOfVariables.begin(), step.NumbersOfVariables.begin() + step.RealMatrix.RowNumber - 1);
 				if (IsFractionalCoefficients) {
 					AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, step.IsArtificialStep);
 					if (state != CONTINUE) {
@@ -1446,7 +1559,8 @@ int main() {
 							ImGui::TextColored(ImColor(255, 0, 0), u8"Решения не существует!");
 						} else if (state == COMPLETED) {
 							// Fractional case
-							GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, false);
+							BubbleSort(step.FracMatrix, BaseVariables, true);
+							GUILayer::DisplaySolutionVector(step.FracMatrix, BaseVariables, step.NumbersOfVariables.size(), false);
 						}
 					}
 				} else {
@@ -1460,7 +1574,8 @@ int main() {
 							ImGui::TextColored(ImColor(255, 0, 0), u8"Решения не существует!");
 						} else if (state == COMPLETED) {
 							// Real case
-							GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, false);
+							BubbleSort(step.RealMatrix, BaseVariables, true);
+							GUILayer::DisplaySolutionVector(step.RealMatrix, BaseVariables, step.NumbersOfVariables.size(), false);
 						}
 					}
 				}
@@ -1558,6 +1673,7 @@ int main() {
 					ImGui::PopID();
 
 					// Display Solution
+					std::vector<int> BaseVariables(step.NumbersOfVariables.begin(), step.NumbersOfVariables.begin() + step.RealMatrix.RowNumber - 1);
 					if (IsFractionalCoefficients) {
 						AlgorithmState state = CheckAlgorithmState(step.FracMatrix, false, step.IsArtificialStep);
 						if (state != CONTINUE) {
@@ -1572,7 +1688,8 @@ int main() {
 								ImGui::TextColored(ImColor(255, 0, 0), u8"Решение неограничено!");
 							} else if (state == COMPLETED) {
 								// Fractional case
-								GUILayer::DisplaySolutionVector(step.FracMatrix, step.NumbersOfVariables, true);
+								BubbleSort(step.FracMatrix, BaseVariables, true);
+								GUILayer::DisplaySolutionVector(step.FracMatrix, BaseVariables, step.NumbersOfVariables.size(), true);
 							}
 							ImGui::EndChild();
 						}
@@ -1590,7 +1707,8 @@ int main() {
 								ImGui::TextColored(ImColor(255, 0, 0), u8"Решение неограничено!");
 							} else if (state == COMPLETED) {
 								// Real case
-								GUILayer::DisplaySolutionVector(step.RealMatrix, step.NumbersOfVariables, true);
+								BubbleSort(step.RealMatrix, BaseVariables, true);
+								GUILayer::DisplaySolutionVector(step.RealMatrix, BaseVariables, step.NumbersOfVariables.size(), true);
 							}
 							ImGui::EndChild();
 						}

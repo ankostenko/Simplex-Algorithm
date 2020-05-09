@@ -22,6 +22,21 @@ static int Clamp(int value, int min, int max) {
 }
 //--------------------
 
+// Bubble sort with column rearranging
+template<typename MatrixType> void BubbleSort(MatrixType &matrix, std::vector<int> &NumberOfVariables, bool IsBaseVariables) {
+		for (int i = 0; i < NumberOfVariables.size(); i++) {
+			for (int j = 0; j < NumberOfVariables.size() - i - 1; j++) {
+				if (NumberOfVariables[j] > NumberOfVariables[j + 1]) {
+					std::swap(NumberOfVariables[j], NumberOfVariables[j + 1]);
+					if (IsBaseVariables) {
+						matrix.SwapRows(j, j + 1);
+					}
+				}
+			}
+		}
+
+}
+
 struct Fraction {
 	int numerator;
 	int denominator;

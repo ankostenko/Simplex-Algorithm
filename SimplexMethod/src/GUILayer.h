@@ -143,45 +143,41 @@ template<typename MatrixType>void MatrixInput(MatrixType& matrix) {
 	ImGui::Columns(1);
 }
 
-template<typename MatrixType> void DisplaySolutionVector(MatrixType &matrix, std::vector<int> &NumbersOfVariables, bool IsCompleteSolution) {
-	ImGui::Columns(NumbersOfVariables.size());
-	for (int i = 0; i < NumbersOfVariables.size(); i++) {
+template<typename MatrixType> void DisplaySolutionVector(MatrixType &matrix, std::vector<int> &BaseVariables, int TotalSize, bool IsCompleteSolution) {
+	ImGui::Columns(TotalSize);
+	for (int i = 0; i < TotalSize; i++) {
 		ImGui::Text((std::string("x") + std::to_string(i + 1)).c_str());
 		ImGui::NextColumn();
 	}
 	ImGui::Separator();
 
-	// Numbers of base variables
-	std::vector<int> BaseVariablesNumbers(NumbersOfVariables.begin(), NumbersOfVariables.begin() + matrix.RowNumber - 1);
-
-	for (int i = 0, RowIndex = 0; i < NumbersOfVariables.size(); i++) {
-		int LastColumnIndex = matrix.ColNumber - 1;
+	// Display resulting vector
+	int LastColumnIndex = matrix.ColNumber - 1;
+	for (int i = 0, BVCounter = 0; i < TotalSize; i++) {
 		if constexpr (IS_SAME_TYPE(MatrixType, Matrix)) {
-			// Real case
-			// If number of variable is base variable
-			if (DoesContain(BaseVariablesNumbers, i + 1)) {
-				ImGui::Text(std::to_string(matrix[RowIndex][LastColumnIndex]).c_str());
-				RowIndex++;
+			if (BVCounter < BaseVariables.size() && i + 1 == BaseVariables[BVCounter]) {
+				ImGui::Text(std::to_string(matrix[BVCounter][LastColumnIndex]).c_str());
+				BVCounter += 1;
 			} else {
-				ImGui::Text("%f", 0.0f);
+				ImGui::Text(std::to_string(0.0f).c_str());
 			}
 		} else {
-			// Fractional case
-			if (DoesContain(BaseVariablesNumbers, i + 1)) {
-				if (matrix[RowIndex][LastColumnIndex].denominator != 1) {
+			if (BVCounter < BaseVariables.size() && i + 1 == BaseVariables[BVCounter]) {
+				if (matrix[BVCounter][LastColumnIndex].denominator != 1) {
 					// We display denominator if it doesn't equal to 1
-					ImGui::Text((std::to_string(matrix[RowIndex][LastColumnIndex].numerator) + std::string("/") + std::to_string(matrix[RowIndex][LastColumnIndex].denominator)).c_str());
+					ImGui::Text((std::to_string(matrix[BVCounter][LastColumnIndex].numerator) + std::string("/") + std::to_string(matrix[BVCounter][LastColumnIndex].denominator)).c_str());
 				} else {
 					// We don't display denominator if it equals to 1
-					ImGui::Text((std::to_string(matrix[RowIndex][LastColumnIndex].numerator)).c_str());
+					ImGui::Text((std::to_string(matrix[BVCounter][LastColumnIndex].numerator)).c_str());
 				}
-				RowIndex++;
+				BVCounter += 1;
 			} else {
 				ImGui::Text("0");
 			}
 		}
 		ImGui::NextColumn();
 	}
+
 	ImGui::Separator();
 	ImGui::Columns(1);
 
