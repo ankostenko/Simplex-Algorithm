@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 /*
 		[x] Работа с обыкновенными и десятичными дробями.
-		[] Контроль данных (защита от «дурака»)
+		[x] Контроль данных (защита от «дурака»)
 		[x] [Сохранение введённой задачи в файл] и чтение из файла.
 		[x] В пошаговом режиме возможность возврата назад.
 		[x] Справка.
@@ -14,10 +14,6 @@
 		[x] В пошаговом режиме возможность выбора опорного элемента.
 		[x] Поддержка мыши.
 */
-
-// DONE: Check if number of basis variables are equal to number of constraints
-// DONE: Check if resulting vector matches column B of an original matrix
-// TODO: Check if chosen basis doesn't lead to degenerative matrix
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -298,6 +294,16 @@ void MakeArtificialFunctionCoefficients(Matrix& matrix) {
 		}
 		matrix[matrix.RowNumber - 1][i] = -ColumnSum;
 	}
+
+	// If last element in a row is less than zero multiply row by (-1)
+	int LastElementInARow = matrix.ColNumber - 1;
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		if (matrix[i][LastElementInARow] < -EPSILON) {
+			for (int j = 0; j < matrix.ColNumber; j++) {
+				matrix[i][j] = matrix[i][j] * (-1);
+			}
+		}
+	}
 }
 
 void MakeArtificialFunctionCeofficients(FractionalMatrix& matrix) {
@@ -307,6 +313,16 @@ void MakeArtificialFunctionCeofficients(FractionalMatrix& matrix) {
 			ColumnSum = ColumnSum + matrix[j][i];
 		}
 		matrix[matrix.RowNumber - 1][i] = -ColumnSum;
+	}
+
+	// If last element in a row is less than zero multiply row by (-1)
+	int LastElementInARow = matrix.ColNumber - 1;
+	for (int i = 0; i < matrix.RowNumber - 1; i++) {
+		if (matrix[i][LastElementInARow] < 0) {
+			for (int j = 0; j < matrix.ColNumber; j++) {
+				matrix[i][j] = matrix[i][j] * (-1);
+			}
+		}
 	}
 }
 
@@ -841,7 +857,7 @@ template<typename MatrixType, typename ElementType> void GaussElimination(Matrix
 	for (int i = 0; i < matrix.RowNumber - 1; i++) {
 		ElementType Pivot = matrix[i][i];
 		if (Genfabs(Pivot) <= ZeroElement) continue;
-		
+
 		for (int j = i; j < matrix.ColNumber; j++) {
 			matrix[i][j] = matrix[i][j] / Pivot;
 		}
@@ -857,7 +873,7 @@ void Print(Matrix& matrix) {
 	}
 }
 
-template<typename MatrixType, typename ElementType>Step ExplicitBasis(Step step, MatrixType& matrix, std::vector<ElementType>& ExplicitBasis, std::vector<bool> &ActiveBasis, std::vector<ElementType>& TargetFunction) {
+template<typename MatrixType, typename ElementType>Step ExplicitBasis(Step step, MatrixType& matrix, std::vector<ElementType>& ExplicitBasis, std::vector<bool>& ActiveBasis, std::vector<ElementType>& TargetFunction) {
 	// Type-independent zero element
 	// Float is [-EPSILON, +EPSILON], Fraction is 0/1
 	ElementType ZeroElement;
@@ -909,14 +925,14 @@ int main() {
 	int IsAutomatic = 1;
 	int SizeConfirmedClicked = 0;
 	int OldSizeCondfirmedClicked = 0;
-	
+
 	int IsArtificialBasis = true;
 	int IsFractionalCoefficients = 0;
-	
+
 	int UnconfirmedIsArtificialBasis = true;
 	int UnconfirmedIsFractionalCoefficients = 0;
 	int UnconfirmedIsAutomatic = 1;
-	
+
 	bool ShowSolution = false;
 	bool StartSimplexAlgorithm = false;
 	bool SizeConfirmedReadyToContinue = false;
@@ -1247,7 +1263,7 @@ int main() {
 		}
 
 		// Jump here if window was closed
-		BeforeShowSolutionTarget:
+	BeforeShowSolutionTarget:
 		if (ShowSolution) {
 			if (FocusOnSolutionWindow) {
 				ImGui::SetNextWindowFocus();
@@ -1314,7 +1330,7 @@ int main() {
 						}
 						ArtificialBasisSteps.push_back(step);
 					}
-					
+
 					if (!step.IsAutomatic) {
 						step.IsWaitingForInput = true;
 					} else {
@@ -1341,14 +1357,13 @@ int main() {
 						StartSimplexAlgorithm = false;
 						SimplexAlgorithmSteps.clear();
 						PreviousArtificialStepID = -1;
-					}	
+					}
 
 					ImGui::Separator();
 					ImGui::EndChild();
 					ImGui::EndTabItem();
 				}
 			} else {
-#if 0
 				// Check if vector doesn't lead to degenerative matrix
 				// Prepare matrix to Gauss elimination
 				std::vector<int> PositionsOfActiveElements;
@@ -1363,7 +1378,6 @@ int main() {
 						PositionsOfActiveElements.push_back(i);
 					}
 				}
-
 				if (IsFractionalCoefficients) {
 					// Swap matrix column and variables to first (RowNumber) columns
 					for (int i = 0; i < PositionsOfActiveElements.size(); i++) {
@@ -1373,18 +1387,19 @@ int main() {
 					}
 
 					// Gauss Elimination
-					GaussElimination<FractionalMatrix, Fraction>(FracMatrix);
-					
+					FractionalMatrix matrix = FracMatrix;
+					GaussElimination<FractionalMatrix, Fraction>(matrix);
+
 					// Check if there's zero rows
-					for (int i = 0; i < FracMatrix.RowNumber - 1; i++) {
+					for (int i = 0; i < matrix.RowNumber - 1; i++) {
 						int CountOfZeroes = 0;
-						for (int j = 0; j < FracMatrix.ColNumber; j++) {
-							if (FracMatrix[i][j] == Fraction(0, 1)) {
+						for (int j = 0; j < matrix.RowNumber - 1; j++) {
+							if (matrix[i][j] == Fraction(0, 1)) {
 								CountOfZeroes += 1;
 							}
 						}
-						if (CountOfZeroes == FracMatrix.ColNumber) {
-							ExplicitBasisErrorMessage = u8"Данный базис дает вырожденную матрицу.";
+						if (CountOfZeroes == matrix.RowNumber - 1) {
+							ExplicitBasisErrorMessage = u8"Данный базис дает вырожденную минор.";
 							ErrorInExplicitBasis = true;
 							ShowSolution = false;
 							ImGui::EndTabBar();
@@ -1402,9 +1417,28 @@ int main() {
 					}
 
 					// Gauss Elimination
-					GaussElimination<Matrix, float>(RealMatrix);
+					Matrix matrix = RealMatrix;
+					GaussElimination<Matrix, float>(matrix);
+
+					// Check if there's zero rows
+					for (int i = 0; i < matrix.RowNumber - 1; i++) {
+						int CountOfZeroes = 0;
+						for (int j = 0; j < matrix.RowNumber - 1; j++) {
+							if (fabs(matrix[i][j]) < EPSILON) {
+								CountOfZeroes += 1;
+							}
+						}
+						if (CountOfZeroes == matrix.RowNumber - 1) {
+							ExplicitBasisErrorMessage = u8"Данный базис дает вырожденную минор.";
+							ErrorInExplicitBasis = true;
+							ShowSolution = false;
+							ImGui::EndTabBar();
+							ImGui::End();
+							goto BeforeShowSolutionTarget;
+							break;
+						}
+					}
 				}
-#endif
 
 				// Check if number of active elements in the explicit vector less or equal then a number of limitations
 				int AmountOfActiveElements = 0;
@@ -1588,7 +1622,7 @@ int main() {
 				}
 			}
 
-			ToStartOfSimplexAlgorithm:
+		ToStartOfSimplexAlgorithm:
 			if (StartSimplexAlgorithm) {
 				if (ImGui::BeginTabItem(u8"Симплекс алгоритм", &StartSimplexAlgorithm, SimplexAlgorithmTabFlags)) {
 					// Simplex algorithm's tab has been closed
@@ -1661,7 +1695,7 @@ int main() {
 								StartSimplexAlgorithm = false;
 								goto ToStartOfSimplexAlgorithm;
 							}
-							
+
 							// One before this last element
 							step = SimplexAlgorithmSteps[LastElementIndex - 1];
 							SimplexAlgorithmSteps.erase(SimplexAlgorithmSteps.begin() + LastElementIndex);
